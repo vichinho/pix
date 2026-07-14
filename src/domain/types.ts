@@ -145,15 +145,32 @@ export interface RecommendationsResponse {
   recommendations: ChampionRecommendation[];
 }
 
+/** Página de runas legible. */
+export interface RuneSelection {
+  primaryStyle: string;
+  keystone: string;
+  primary: string[];
+  secondaryStyle: string;
+  secondary: string[];
+  shards: string[];
+}
+
 /** Contrato: build del campeón (GET /api/builds). */
 export interface ChampionBuild {
   championId: number;
   championName: string;
   role: Role;
-  patch: string;
-  runes: number[];
-  summonerSpells: number[];
-  coreItems: number[];
-  situationalItems: number[];
+  summonerSpells: string[];
+  runes: RuneSelection;
+  startingItems: string[];
+  coreItems: string[];
+  situationalItems: string[];
+  /** Prioridad de subida de habilidades, p.ej. ["Q", "E", "W"]. */
   skillOrder: string[];
+  /** Origen de la build ("curated", nombre del proveedor externo, etc.). */
+  source: string;
+  /** Parche o versión de referencia de la build. */
+  patch: string;
+  /** Nota breve opcional para el jugador. */
+  notes?: string;
 }

@@ -9,6 +9,9 @@ import { GetPlayerProfileUseCase, type PlayerIdentity } from '../application/get
 import { GetRecentMatchesUseCase } from '../application/get-recent-matches.js';
 import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
 import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
+import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
+import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
+import type { BuildProvider } from '../domain/build.js';
 import { ClientDetector } from '../infrastructure/lcu/client-detector.js';
 import { ChampSelectReader } from '../infrastructure/lcu/champ-select.js';
 import { GameQueueDetector } from '../infrastructure/lcu/game-queue.js';
@@ -28,6 +31,7 @@ export interface ServerDeps {
   championTraits?: ChampionTraitProvider;
   /** Cliente Riot API; si es null/ausente, las rutas de perfil/historial devuelven 503. */
   riotClient?: RiotApiClient | null;
+  buildProvider?: BuildProvider;
 }
 
 const recommendationsQuerySchema = z.object({
@@ -36,6 +40,11 @@ const recommendationsQuerySchema = z.object({
   personalized: z.enum(['true', 'false']).optional(),
   gameName: z.string().min(1).optional(),
   tagLine: z.string().min(1).optional(),
+});
+
+const buildsQuerySchema = z.object({
+  championId: z.coerce.number().int().positive(),
+  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']).optional(),
 });
 
 const identityQuerySchema = z.object({
@@ -81,6 +90,8 @@ export function createServer(deps: ServerDeps = {}): Express {
     champSelectReader,
   );
   const getAramAnalysis = new GetAramAnalysisUseCase(aramReader, championTraits);
+  const buildProvider = deps.buildProvider ?? new SeedBuildProvider();
+  const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
   const riotClient = deps.riotClient ?? null;
   const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
   const getRecentMatches = riotClient ? new GetRecentMatchesUseCase(riotClient) : null;
@@ -264,11 +275,24 @@ export function createServer(deps: ServerDeps = {}): Express {
     }
   });
 
+  app.get('/api/builds', (req: Request, res: Response) => {
+    const parsed = buildsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const build = getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
+    if (!build) {
+      res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });
+      return;
+    }
+    res.json(build);
+  });
+
   // Rutas planificadas en la especificación, aún no implementadas.
   const notImplemented = (name: string) => (_req: Request, res: Response) => {
     res.status(501).json({ error: 'not_implemented', endpoint: name });
   };
-  app.get('/api/builds', notImplemented('builds'));
   app.get('/api/settings', notImplemented('settings'));
   app.put('/api/settings', notImplemented('settings'));
 

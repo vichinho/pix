@@ -27,6 +27,7 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Estadísticas de rendimiento reciente (winrate/KDA) | ✅ Implementado |
 | Análisis de composición ARAM + mejor opción de banca | ✅ Implementado |
 | Perfil e historial de partidas (Riot API) | ✅ Implementado |
+| Build del campeón (runas/items/hechizos/skill order) | ✅ Seed curada |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
 
@@ -119,6 +120,20 @@ curl "http://127.0.0.1:3535/api/player/profile?gameName=Vishox&tagLine=LAS"
 curl "http://127.0.0.1:3535/api/player/matches?gameName=Vishox&tagLine=LAS&count=5"
 # {"matches":[{"matchId":"LA1_1","championName":"Ahri","role":"MIDDLE","kills":8,...}]}
 ```
+
+`/api/builds?championId=101&role=MIDDLE` devuelve la build recomendada (hechizos,
+página de runas, ítems iniciales/core/situacionales y orden de habilidades). Usa un
+**proveedor abstraído** (`BuildProvider`) con una **seed curada local** como fallback;
+los campeones aún no cubiertos responden `404 build_not_found`.
+
+```bash
+curl "http://127.0.0.1:3535/api/builds?championId=101&role=MIDDLE"
+# {"championName":"Xerath","runes":{"keystone":"Cometa Arcano",...},"coreItems":[...],"skillOrder":["Q","W","E"],"source":"curated"}
+```
+
+> Las builds son curadas (marcadas `patch:"curado"`), pensadas como fallback y punto
+> de partida ajustable por parche; la arquitectura permite anteponer un proveedor
+> externo (op.gg/u.gg u otra fuente) vía `FallbackBuildProvider`.
 
 `/api/aram/analysis` (sólo en ARAM, normal o de evento) lee tu equipo y la **banca**
 de campeones, analiza la **composición** (mezcla AD/AP, frontline, sustain/curación,

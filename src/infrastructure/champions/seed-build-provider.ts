@@ -1,0 +1,189 @@
+import type { BuildProvider } from '../../domain/build.js';
+import type { ChampionBuild, Role } from '../../domain/types.js';
+
+/**
+ * Builds curadas como fuente local (fallback). Enfocadas en el pool del jugador
+ * y en picks comunes. Son un punto de partida legible y ajustable: los ítems y
+ * runas pueden variar por parche, y la idea es complementar/reemplazar esto con
+ * un proveedor externo más adelante (op.gg/u.gg u otra fuente).
+ *
+ * `patch` se marca como "curado" para dejar claro que no viene de una fuente en
+ * vivo. Cada build indica su rol principal; se sirve aunque el rol pedido no
+ * coincida exactamente (muchos campeones tienen una build dominante).
+ */
+const PATCH = 'curado';
+
+type SeedBuild = Omit<ChampionBuild, 'source' | 'patch'>;
+
+const BUILDS: SeedBuild[] = [
+  {
+    championId: 101,
+    championName: 'Xerath',
+    role: 'MIDDLE',
+    summonerSpells: ['Flash', 'Ignite'],
+    runes: {
+      primaryStyle: 'Brujería',
+      keystone: 'Cometa Arcano',
+      primary: ['Flujo de Maná', 'Trascendencia', 'Chamuscar'],
+      secondaryStyle: 'Inspiración',
+      secondary: ['Galleta Mágica', 'Perspicacia Cósmica'],
+      shards: ['Aceleración de Habilidad', 'PA Adaptativo', 'Vida'],
+    },
+    startingItems: ['Anillo de Doran', 'Poción de Salud'],
+    coreItems: ['Compañía de Ludens', 'Botas de Hechicero', 'Fuego Negro (Shadowflame)'],
+    situationalItems: ['Foco del Horizonte', 'Sombrero Mortal de Rabadon', 'Bastón del Vacío', 'Reloj de Arena de Zhonya'],
+    skillOrder: ['Q', 'W', 'E'],
+    notes: 'Poke a distancia; maximiza Q y castea desde lejos.',
+  },
+  {
+    championId: 134,
+    championName: 'Syndra',
+    role: 'MIDDLE',
+    summonerSpells: ['Flash', 'Ignite'],
+    runes: {
+      primaryStyle: 'Brujería',
+      keystone: 'Cometa Arcano',
+      primary: ['Flujo de Maná', 'Trascendencia', 'Chamuscar'],
+      secondaryStyle: 'Inspiración',
+      secondary: ['Botas Mágicas', 'Perspicacia Cósmica'],
+      shards: ['Aceleración de Habilidad', 'PA Adaptativo', 'Vida'],
+    },
+    startingItems: ['Anillo de Doran', 'Poción de Salud'],
+    coreItems: ['Compañía de Ludens', 'Botas de Hechicero', 'Fuego Negro (Shadowflame)'],
+    situationalItems: ['Sombrero Mortal de Rabadon', 'Reloj de Arena de Zhonya', 'Bastón del Vacío'],
+    skillOrder: ['Q', 'W', 'E'],
+    notes: 'Sube stacks de Q; combo E+Q para burst.',
+  },
+  {
+    championId: 950,
+    championName: 'Naafiri',
+    role: 'MIDDLE',
+    summonerSpells: ['Flash', 'Ignite'],
+    runes: {
+      primaryStyle: 'Precisión',
+      keystone: 'Conquistador',
+      primary: ['Triunfo', 'Leyenda: Presteza', 'Último Aliento'],
+      secondaryStyle: 'Dominación',
+      secondary: ['Impacto Súbito', 'Cazador Voraz'],
+      shards: ['AD Adaptativo', 'AD Adaptativo', 'Vida'],
+    },
+    startingItems: ['Espada Larga', 'Poción de Salud'],
+    coreItems: ['Eclipse', 'Botas de Movilidad Ionianas', 'Rencor de Serylda'],
+    situationalItems: ['Filo de la Noche', 'Danza de la Muerte', 'Convergencia de Máscara de la Muerte'],
+    skillOrder: ['Q', 'E', 'W'],
+    notes: 'Asesina con jauría; usa E para engage y R para pelear.',
+  },
+  {
+    championId: 8,
+    championName: 'Vladimir',
+    role: 'MIDDLE',
+    summonerSpells: ['Flash', 'Ignite'],
+    runes: {
+      primaryStyle: 'Brujería',
+      keystone: 'Cometa Arcano',
+      primary: ['Cadena de Maná (Banda)', 'Trascendencia', 'Ardor'],
+      secondaryStyle: 'Precisión',
+      secondary: ['Presencia de Ánimo', 'Golpe de Gracia'],
+      shards: ['Aceleración de Habilidad', 'PA Adaptativo', 'Vida'],
+    },
+    startingItems: ['Anillo de Doran', 'Poción de Salud'],
+    coreItems: ['Hacedor de Grietas (Riftmaker)', 'Botas de Hechicero', 'Reloj de Arena de Zhonya'],
+    situationalItems: ['Sombrero Mortal de Rabadon', 'Impulso Cósmico', 'Convergencia Espiritual'],
+    skillOrder: ['Q', 'E', 'W'],
+    notes: 'Escala fuerte; usa W (poza) para esquivar habilidades clave.',
+  },
+  {
+    championId: 902,
+    championName: 'Milio',
+    role: 'UTILITY',
+    summonerSpells: ['Flash', 'Ignite'],
+    runes: {
+      primaryStyle: 'Brujería',
+      keystone: 'Aery Invocada',
+      primary: ['Flujo de Maná', 'Trascendencia', 'Concentración Absoluta'],
+      secondaryStyle: 'Inspiración',
+      secondary: ['Obsequio Mágico', 'Perspicacia Cósmica'],
+      shards: ['Aceleración de Habilidad', 'PA Adaptativo', 'Vida'],
+    },
+    startingItems: ['Reliquia del Escudo de Acero', 'Poción de Salud'],
+    coreItems: ['Renovador de Piedra Lunar', 'Botas Ionianas', 'Bastón de Aguas Fluidas'],
+    situationalItems: ['Incensario Ardiente', 'Redención', 'Báculo de Cristal de Comando'],
+    skillOrder: ['Q', 'E', 'W'],
+    notes: 'Enchantador de rango; escuda y cura, R limpia CC.',
+  },
+  {
+    championId: 57,
+    championName: 'Maokai',
+    role: 'UTILITY',
+    summonerSpells: ['Flash', 'Ignite'],
+    runes: {
+      primaryStyle: 'Resolución',
+      keystone: 'Choque Posterior (Aftershock)',
+      primary: ['Demolición', 'Segundo Aliento', 'Sonrisa Cadavérica'],
+      secondaryStyle: 'Inspiración',
+      secondary: ['Hechizo Fantasma', 'Perspicacia Cósmica'],
+      shards: ['Aceleración de Habilidad', 'Vida', 'Vida'],
+    },
+    startingItems: ['Reliquia del Escudo de Acero', 'Poción de Salud'],
+    coreItems: ['Canción de Sangre (Bloodsong)', 'Botas de Placas de Acero', 'Relicario del Sol Naciente'],
+    situationalItems: ['Voto del Caballero', 'Convergencia de Zeke', 'Corazón Helado'],
+    skillOrder: ['Q', 'E', 'W'],
+    notes: 'Engage con W; buen frontline y CC.',
+  },
+  {
+    championId: 63,
+    championName: 'Brand',
+    role: 'MIDDLE',
+    summonerSpells: ['Flash', 'Ignite'],
+    runes: {
+      primaryStyle: 'Brujería',
+      keystone: 'Cometa Arcano',
+      primary: ['Flujo de Maná', 'Trascendencia', 'Chamuscar'],
+      secondaryStyle: 'Precisión',
+      secondary: ['Presencia de Ánimo', 'Golpe de Gracia'],
+      shards: ['Aceleración de Habilidad', 'PA Adaptativo', 'Vida'],
+    },
+    startingItems: ['Anillo de Doran', 'Poción de Salud'],
+    coreItems: ['Tormento de Liandry', 'Botas de Hechicero', 'Fuego Negro (Shadowflame)'],
+    situationalItems: ['Cristal de Rylai', 'Sombrero Mortal de Rabadon', 'Bastón del Vacío'],
+    skillOrder: ['W', 'Q', 'E'],
+    notes: 'Daño en área y quemadura; encadena pasiva para stun.',
+  },
+];
+
+/** Proveedor de builds basado en la seed curada local. */
+export class SeedBuildProvider implements BuildProvider {
+  readonly name = 'curated';
+  private readonly byChampion: Map<number, ChampionBuild>;
+
+  constructor(builds: SeedBuild[] = BUILDS) {
+    this.byChampion = new Map(
+      builds.map((b) => [b.championId, { ...b, source: 'curated', patch: PATCH }]),
+    );
+  }
+
+  getBuild(championId: number, _role: Role): ChampionBuild | null {
+    const build = this.byChampion.get(championId);
+    if (!build) return null;
+    // Copia profunda para que quien consuma no mute la seed.
+    return {
+      ...build,
+      summonerSpells: [...build.summonerSpells],
+      runes: {
+        ...build.runes,
+        primary: [...build.runes.primary],
+        secondary: [...build.runes.secondary],
+        shards: [...build.runes.shards],
+      },
+      startingItems: [...build.startingItems],
+      coreItems: [...build.coreItems],
+      situationalItems: [...build.situationalItems],
+      skillOrder: [...build.skillOrder],
+    };
+  }
+
+  /** championIds cubiertos por la seed (útil para UI/depuración). */
+  coveredChampionIds(): number[] {
+    return [...this.byChampion.keys()];
+  }
+}
