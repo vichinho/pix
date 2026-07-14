@@ -2,7 +2,17 @@ import { loadConfig } from './config/config.js';
 import { createServer } from './api/server.js';
 import { RiotApiClient } from './infrastructure/riot/riot-api-client.js';
 
+/** Carga variables desde .env si existe (Node 20.12+/22). */
+function loadDotEnv(): void {
+  try {
+    process.loadEnvFile();
+  } catch {
+    // No hay .env: se usan las variables ya presentes en el entorno.
+  }
+}
+
 function main(): void {
+  loadDotEnv();
   const config = loadConfig();
 
   const riotClient = config.riotApiKey
