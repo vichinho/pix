@@ -1,0 +1,301 @@
+'use strict';
+
+// --- Utilidades ---------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+
+async function api(path) {
+  try {
+    const res = await fetch(path);
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      /* respuesta sin cuerpo JSON */
+    }
+    return { ok: res.ok, status: res.status, data };
+  } catch (err) {
+    return { ok: false, status: 0, data: { error: String(err) } };
+  }
+}
+
+const esc = (s) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const ROLE_ES = { TOP: 'Top', JUNGLE: 'Jungla', MIDDLE: 'Mid', BOTTOM: 'ADC', UTILITY: 'Support', UNKNOWN: '—' };
+
+// --- Estado de cliente y Riot ------------------------------------------
+let riotConfigured = false;
+
+async function refreshStatus() {
+  const { data } = await api('/api/client/status');
+  const badge = $('clientBadge');
+  if (data && data.connected) {
+    badge.textContent = `Cliente: ${stateEs(data.clientState)}`;
+    badge.className = 'badge badge-on';
+  } else {
+    badge.textContent = 'Cliente: desconectado';
+    badge.className = 'badge badge-off';
+  }
+  return data;
+}
+
+function stateEs(s) {
+  return (
+    {
+      DISCONNECTED: 'desconectado',
+      NONE: 'menú',
+      LOBBY: 'lobby',
+      MATCHMAKING: 'en cola',
+      READY_CHECK: 'aceptar',
+      CHAMP_SELECT: 'champ select',
+      IN_GAME: 'en partida',
+      POST_GAME: 'post-partida',
+    }[s] || s || '—'
+  );
+}
+
+// --- Perfil / stats / partidas -----------------------------------------
+async function refreshRiotPanels() {
+  const prof = await api('/api/player/profile');
+  if (prof.status === 503) {
+    riotConfigured = false;
+    $('riotBadge').textContent = 'Riot API: no configurada';
+    $('riotBadge').className = 'badge badge-off';
+    $('profileBody').innerHTML = '<span class="muted">Define RIOT_API_KEY en .env para ver perfil, historial y estadísticas.</span>';
+    return;
+  }
+  riotConfigured = true;
+  $('riotBadge').textContent = 'Riot API: activa';
+  $('riotBadge').className = 'badge badge-on';
+
+  if (prof.ok && prof.data) {
+    const p = prof.data;
+    $('profileBody').innerHTML = `<div class="kv">
+      <span class="k">Invocador</span><span>${esc(p.gameName)} #${esc(p.tagLine)}</span>
+      <span class="k">Nivel</span><span>${esc(p.summonerLevel ?? '—')}</span>
+      <span class="k">Región</span><span>${esc(p.region)}</span>
+    </div>`;
+  } else {
+    $('profileBody').innerHTML = `<span class="err">No se pudo cargar el perfil (${esc(prof.data?.error || prof.status)}).</span>`;
+  }
+
+  refreshStats();
+  refreshMatches();
+}
+
+async function refreshStats() {
+  const { ok, data, status } = await api('/api/player/stats?count=20');
+  if (!ok) {
+    $('statsBody').innerHTML = `<span class="err">${esc(data?.error || status)}</span>`;
+    return;
+  }
+  const wr = Math.round((data.winRate || 0) * 100);
+  const top = (data.byChampion || []).slice(0, 6);
+  const rows = top
+    .map(
+      (c) => `<tr>
+        <td>${esc(c.championName)}</td>
+        <td>${c.games}</td>
+        <td class="${c.winRate >= 0.5 ? 'win' : 'loss'}">${Math.round(c.winRate * 100)}%</td>
+        <td>${c.kda}</td>
+      </tr>`,
+    )
+    .join('');
+  $('statsBody').innerHTML = `
+    <div class="muted" style="margin-bottom:.5rem">Últimas ${data.totalGames} · <span class="${wr >= 50 ? 'win' : 'loss'}">${wr}% WR</span> (${data.wins}V ${data.losses}D)</div>
+    <table><thead><tr><th>Campeón</th><th>P</th><th>WR</th><th>KDA</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function refreshMatches() {
+  const { ok, data, status } = await api('/api/player/matches?count=8');
+  if (!ok) {
+    $('matchesBody').innerHTML = `<span class="err">${esc(data?.error || status)}</span>`;
+    return;
+  }
+  const rows = (data.matches || [])
+    .map(
+      (m) => `<tr>
+        <td>${esc(m.championName)}</td>
+        <td>${esc(ROLE_ES[m.role] || m.role)}</td>
+        <td>${m.kills}/${m.deaths}/${m.assists}</td>
+        <td class="${m.win ? 'win' : 'loss'}">${m.win ? 'V' : 'D'}</td>
+      </tr>`,
+    )
+    .join('');
+  $('matchesBody').innerHTML = `<table><thead><tr><th>Campeón</th><th>Rol</th><th>KDA</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// --- Recomendaciones ----------------------------------------------------
+function renderRecommendations(target, data) {
+  if (!data || !data.recommendations || data.recommendations.length === 0) {
+    target.innerHTML = '<span class="muted">Sin sugerencias para este rol.</span>';
+    return;
+  }
+  const items = data.recommendations
+    .map(
+      (r) => `<li class="recitem">
+        <span><span class="name">${esc(r.championName)}</span> <span class="reason">${esc(reasonEs(r.reason))}</span></span>
+        <span class="score">${r.score}</span>
+      </li>`,
+    )
+    .join('');
+  const meta = data.personalized ? ` <span class="badge badge-live">personalizado · ${data.basedOnGames} partidas</span>` : '';
+  target.innerHTML = `<div class="muted" style="margin-bottom:.5rem">Rol: ${esc(ROLE_ES[data.role] || data.role)}${meta}</div><ul class="reclist">${items}</ul>`;
+}
+
+function reasonEs(r) {
+  return { meta_pick: 'meta', comfort_pick: 'cómodo', comfort_pick_plus_meta: 'cómodo + meta' }[r] || r || '';
+}
+
+async function loadRecommendations() {
+  const role = $('roleSelect').value;
+  const personalized = $('personalizedChk').checked;
+  $('recBody').innerHTML = '<span class="spinner">Cargando…</span>';
+  let path = `/api/recommendations?role=${role}&limit=5`;
+  if (personalized) path += '&personalized=true';
+  const { ok, data, status } = await api(path);
+  if (!ok) {
+    const msg = status === 503 ? 'Requiere RIOT_API_KEY para personalizar.' : data?.error || status;
+    $('recBody').innerHTML = `<span class="err">${esc(msg)}</span>`;
+    return;
+  }
+  renderRecommendations($('recBody'), data);
+}
+
+// --- Build --------------------------------------------------------------
+async function loadBuild() {
+  const id = $('buildChampId').value;
+  const role = $('buildRole').value;
+  if (!id) return;
+  $('buildBody').innerHTML = '<span class="spinner">Cargando…</span>';
+  const { ok, data, status } = await api(`/api/builds?championId=${id}&role=${role}`);
+  if (!ok) {
+    const msg = status === 404 ? 'Sin build curada para ese campeón todavía.' : data?.error || status;
+    $('buildBody').innerHTML = `<span class="err">${esc(msg)}</span>`;
+    return;
+  }
+  $('buildBody').innerHTML = renderBuild(data);
+}
+
+function renderBuild(b) {
+  const list = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join('');
+  return `
+    <div class="kv"><span class="k">Campeón</span><span>${esc(b.championName)} · ${esc(ROLE_ES[b.role] || b.role)}</span>
+      <span class="k">Hechizos</span><span>${esc((b.summonerSpells || []).join(' + '))}</span>
+      <span class="k">Skill order</span><span>${esc((b.skillOrder || []).join(' > '))}</span></div>
+    <div class="build-block"><div class="label">Runas</div>
+      <div>${esc(b.runes.keystone)} <span class="muted">(${esc(b.runes.primaryStyle)})</span> — ${list(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}</span> ${list(b.runes.secondary)} · ${list(b.runes.shards)}</div></div>
+    <div class="build-block"><div class="label">Ítems iniciales</div><div>${list(b.startingItems)}</div></div>
+    <div class="build-block"><div class="label">Core</div><div>${list(b.coreItems)}</div></div>
+    <div class="build-block"><div class="label">Situacionales</div><div>${list(b.situationalItems)}</div></div>
+    ${b.notes ? `<div class="muted" style="margin-top:.5rem">💡 ${esc(b.notes)}</div>` : ''}
+    <div class="muted" style="margin-top:.4rem">Fuente: ${esc(b.source)} · ${esc(b.patch)}</div>`;
+}
+
+// --- Contexto: cola, champ select, ARAM --------------------------------
+async function refreshContext(clientState) {
+  const queue = await api('/api/game/queue');
+  const qBadge = $('queueBadge');
+  if (queue.ok && queue.data && queue.data.active && queue.data.queue) {
+    qBadge.textContent = queue.data.queue.label;
+    qBadge.className = 'badge badge-live';
+  } else {
+    qBadge.textContent = '—';
+    qBadge.className = 'badge badge-muted';
+  }
+
+  const isAram = queue.ok && queue.data?.queue?.category === 'ARAM';
+
+  if (isAram) {
+    return refreshAram();
+  }
+  if (clientState === 'CHAMP_SELECT') {
+    return refreshChampSelect();
+  }
+  $('contextTitle').textContent = 'Contexto';
+  $('contextBody').innerHTML =
+    '<span class="muted">Sin champ select activo. Entra a una partida para ver recomendaciones o análisis de ARAM.</span>';
+}
+
+async function refreshChampSelect() {
+  $('contextTitle').textContent = 'Champion Select';
+  const { data } = await api('/api/champ-select/session');
+  if (!data || !data.active || !data.session) {
+    $('contextBody').innerHTML = '<span class="muted">Detectando champ select…</span>';
+    return;
+  }
+  const s = data.session;
+  const rec = await api(`/api/recommendations?role=${s.assignedRole}&limit=5${riotConfigured ? '&personalized=true' : ''}`);
+  let recHtml = '<span class="muted">—</span>';
+  if (rec.ok) {
+    const tmp = document.createElement('div');
+    renderRecommendations(tmp, rec.data);
+    recHtml = tmp.innerHTML;
+  }
+  $('contextBody').innerHTML = `
+    <div class="kv">
+      <span class="k">Rol</span><span>${esc(ROLE_ES[s.assignedRole] || s.assignedRole)}</span>
+      <span class="k">Fase</span><span>${esc(s.phase)}</span>
+      <span class="k">Tu campeón</span><span>${s.selectedChampionId ? '#' + s.selectedChampionId + (s.pickCompleted ? ' (confirmado)' : ' (eligiendo)') : '—'}</span>
+      <span class="k">Bans</span><span>${(s.bans || []).map((b) => `<span class="tag bad">#${b}</span>`).join('') || '—'}</span>
+    </div>
+    <div class="build-block"><div class="label">Sugerencias para tu rol</div>${recHtml}</div>`;
+}
+
+async function refreshAram() {
+  $('contextTitle').textContent = 'ARAM — Análisis de composición';
+  const { data } = await api('/api/aram/analysis');
+  if (!data || !data.isAram) {
+    $('contextBody').innerHTML = '<span class="muted">Detectando sesión de ARAM…</span>';
+    return;
+  }
+  const comp = data.currentComp;
+  const balanced = comp.balanced
+    ? '<span class="balanced-yes">✅ Equipo equilibrado</span>'
+    : '<span class="balanced-no">⚠️ Falta algo</span>';
+  const missing = (comp.missing || []).map((m) => `<span class="tag bad">${esc(m)}</span>`).join('');
+  const strengths = (comp.strengths || []).map((m) => `<span class="tag good">${esc(m)}</span>`).join('');
+  const team = (data.team || [])
+    .map((c) => `<span class="tag${c.isLocalPlayer ? ' good' : ''}">${esc(c.championName)}${c.isLocalPlayer ? ' (tú)' : ''}</span>`)
+    .join('');
+  const bench = (data.bench || []).map((c) => `<span class="tag">${esc(c.championName)}</span>`).join('') || '<span class="muted">—</span>';
+
+  let best = '<span class="muted">—</span>';
+  if (data.bestOption) {
+    const o = data.bestOption;
+    best = `<span class="name">${esc(o.championName)}</span> <span class="score">${o.fitScore}</span> ${(o.fillsGaps || [])
+      .map((g) => `<span class="tag good">${esc(g)}</span>`)
+      .join('')}`;
+  }
+  const options = (data.options || [])
+    .map((o) => `<li class="recitem"><span class="name">${esc(o.championName)}</span><span class="score">${o.fitScore}</span></li>`)
+    .join('');
+
+  $('contextBody').innerHTML = `
+    <div style="margin-bottom:.5rem">${balanced}</div>
+    <div class="kv">
+      <span class="k">Equipo</span><span>${team}</span>
+      <span class="k">Banca</span><span>${bench}</span>
+      <span class="k">Mezcla</span><span>${comp.adCount} AD · ${comp.apCount} AP · frontline ${comp.frontlineCount} · sustain ${comp.sustainCount} · CC ${comp.hardCcCount}</span>
+    </div>
+    ${missing ? `<div class="build-block"><div class="label">Le falta</div><div>${missing}</div></div>` : ''}
+    ${strengths ? `<div class="build-block"><div class="label">Fortalezas</div><div>${strengths}</div></div>` : ''}
+    <div class="build-block"><div class="label">Mejor elección de tu banca</div><div class="recitem">${best}</div></div>
+    ${options ? `<div class="build-block"><div class="label">Opciones (tú + banca)</div><ul class="reclist">${options}</ul></div>` : ''}`;
+}
+
+// --- Bucle de refresco --------------------------------------------------
+async function tick() {
+  const status = await refreshStatus();
+  await refreshContext(status?.clientState);
+}
+
+$('recBtn').addEventListener('click', loadRecommendations);
+$('buildBtn').addEventListener('click', loadBuild);
+
+// Arranque
+refreshRiotPanels();
+tick();
+setInterval(tick, 4000);
+// Reintenta los paneles Riot con menor frecuencia (por si activan la key luego).
+setInterval(refreshRiotPanels, 30000);

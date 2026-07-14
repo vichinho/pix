@@ -1,4 +1,5 @@
 import express, { type Express, type Request, type Response } from 'express';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { GetClientStatusUseCase } from '../application/get-client-status.js';
 import { GetChampSelectSessionUseCase } from '../application/get-champ-select-session.js';
@@ -32,6 +33,8 @@ export interface ServerDeps {
   /** Cliente Riot API; si es null/ausente, las rutas de perfil/historial devuelven 503. */
   riotClient?: RiotApiClient | null;
   buildProvider?: BuildProvider;
+  /** Directorio de la UI web estática. Por defecto, la carpeta `public` del repo. */
+  staticDir?: string | null;
 }
 
 const recommendationsQuerySchema = z.object({
@@ -115,6 +118,15 @@ export function createServer(deps: ServerDeps = {}): Express {
 
   const app = express();
   app.use(express.json());
+
+  // UI web estática (dashboard). Se puede desactivar con staticDir: null.
+  const staticDir =
+    deps.staticDir === null
+      ? null
+      : deps.staticDir ?? fileURLToPath(new URL('../../public', import.meta.url));
+  if (staticDir) {
+    app.use(express.static(staticDir));
+  }
 
   app.get('/api/health', (_req: Request, res: Response) => {
     res.json({ ok: true });

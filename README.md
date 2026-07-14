@@ -28,6 +28,7 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Análisis de composición ARAM + mejor opción de banca | ✅ Implementado |
 | Perfil e historial de partidas (Riot API) | ✅ Implementado |
 | Build del campeón (runas/items/hechizos/skill order) | ✅ Seed curada |
+| Interfaz web (dashboard) servida por el backend | ✅ Implementado |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
 
@@ -61,10 +62,17 @@ Si el cliente está cerrado, `/api/client/status` responde `DISCONNECTED` sin er
 npm install
 cp .env.example .env      # configura RIOT_API_KEY, región, etc.
 
-npm run dev               # backend en modo watch
+npm run dev               # backend + UI en modo watch
 npm run typecheck
 npm test
 ```
+
+Luego abre el **dashboard** en el navegador: **http://127.0.0.1:3535/**
+
+La UI (dark theme, sin paso de build) se sirve desde `public/` y consume la API local:
+muestra estado del cliente, perfil, historial y estadísticas, y se adapta al contexto
+(champ select con recomendaciones, o análisis de composición en ARAM), además de una
+consulta de builds. Es la base para migrar luego a React/Electron.
 
 Ejemplos de respuesta con el cliente cerrado:
 
@@ -198,7 +206,8 @@ src/
 ├─ infrastructure/
 │  ├─ lcu/            # Lockfile, conector, detector, champ select, ARAM, cola
 │  ├─ riot/           # Cliente de la Riot API (account, summoner, match)
-│  └─ champions/      # Seed de pool y metadatos de campeones
+│  └─ champions/      # Seed de pool, metadatos y builds de campeones
+public/               # UI web estática (dashboard): index.html, styles.css, app.js
 ├─ api/               # Servidor Express y rutas locales
 ├─ config/            # Carga y validación de configuración (Zod)
 └─ index.ts           # Punto de entrada del backend
