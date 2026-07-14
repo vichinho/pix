@@ -23,6 +23,8 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Champion select (rol asignado, campeón elegido, bans) | ✅ Implementado |
 | Tipo de partida (casual/normal/ranked/flex/práctica/…) | ✅ Implementado |
 | Recomendaciones de campeones por rol (reglas) | ✅ Implementado |
+| Recomendaciones personalizadas por historial | ✅ Implementado |
+| Estadísticas de rendimiento reciente (winrate/KDA) | ✅ Implementado |
 | Análisis de composición ARAM + mejor opción de banca | ✅ Implementado |
 | Perfil e historial de partidas (Riot API) | ✅ Implementado |
 | Builds | 🚧 Stub (501) |
@@ -141,6 +143,19 @@ disponible (tu campeón actual o uno de la banca) para cubrir los huecos del equ
 
 > Cobertura: el análisis usa un dataset curado de campeones. Los que aún no estén
 > en el dataset se marcan con `"unknown": true` y no se evalúan (se informa aparte).
+
+`/api/player/stats` resume tu rendimiento reciente (winrate y KDA por campeón y por
+rol). Y `/api/recommendations?personalized=true` combina el pool meta con tu historial:
+tus campeones dominados en el rol (≥2 partidas) entran como candidatos y suben por
+comfort + winrate (requiere `RIOT_API_KEY`):
+
+```bash
+curl "http://127.0.0.1:3535/api/player/stats"
+# {"totalGames":20,"winRate":0.55,"byChampion":[{"championName":"Syndra","games":6,"winRate":0.66,"kda":3.1},...],"byRole":[...]}
+
+curl "http://127.0.0.1:3535/api/recommendations?personalized=true&role=MIDDLE"
+# {"role":"MIDDLE","recommendations":[...],"personalized":true,"basedOnGames":20}
+```
 
 Durante champion select, `/api/champ-select/session` devuelve `active:true` con el
 rol asignado, el campeón elegido, si el pick está confirmado y los bans:

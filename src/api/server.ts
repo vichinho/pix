@@ -7,6 +7,8 @@ import { GetChampionRecommendationsUseCase } from '../application/get-champion-r
 import { GetAramAnalysisUseCase } from '../application/get-aram-analysis.js';
 import { GetPlayerProfileUseCase, type PlayerIdentity } from '../application/get-player-profile.js';
 import { GetRecentMatchesUseCase } from '../application/get-recent-matches.js';
+import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
+import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
 import { ClientDetector } from '../infrastructure/lcu/client-detector.js';
 import { ChampSelectReader } from '../infrastructure/lcu/champ-select.js';
 import { GameQueueDetector } from '../infrastructure/lcu/game-queue.js';
@@ -31,6 +33,9 @@ export interface ServerDeps {
 const recommendationsQuerySchema = z.object({
   role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']).optional(),
   limit: z.coerce.number().int().min(1).max(10).optional(),
+  personalized: z.enum(['true', 'false']).optional(),
+  gameName: z.string().min(1).optional(),
+  tagLine: z.string().min(1).optional(),
 });
 
 const identityQuerySchema = z.object({
@@ -79,6 +84,10 @@ export function createServer(deps: ServerDeps = {}): Express {
   const riotClient = deps.riotClient ?? null;
   const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
   const getRecentMatches = riotClient ? new GetRecentMatchesUseCase(riotClient) : null;
+  const getPlayerStats = getRecentMatches ? new GetPlayerStatsUseCase(getRecentMatches) : null;
+  const getPersonalizedRecommendations = getRecentMatches
+    ? new GetPersonalizedRecommendationsUseCase(championPool, getRecentMatches, champSelectReader)
+    : null;
 
   /** Resuelve la identidad Riot: primero de la query, luego del cliente local. */
   async function resolveIdentity(
@@ -141,10 +150,37 @@ export function createServer(deps: ServerDeps = {}): Express {
       res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
       return;
     }
+    const { role, limit, personalized, gameName, tagLine } = parsed.data;
+
+    // Ruta personalizada: combina el pool base con el historial del jugador.
+    if (personalized === 'true') {
+      if (!getPersonalizedRecommendations) {
+        res.status(503).json({ error: 'riot_not_configured' });
+        return;
+      }
+      const identity = await resolveIdentity(gameName, tagLine);
+      if (!identity) {
+        res.status(400).json({ error: 'identity_unavailable' });
+        return;
+      }
+      try {
+        res.json(
+          await getPersonalizedRecommendations.execute({
+            identity,
+            ...(role ? { role } : {}),
+            ...(limit ? { limit } : {}),
+          }),
+        );
+      } catch (err) {
+        riotErrorResponse(res, err);
+      }
+      return;
+    }
+
     try {
       const result = await getRecommendations.execute({
-        ...(parsed.data.role ? { role: parsed.data.role } : {}),
-        ...(parsed.data.limit ? { limit: parsed.data.limit } : {}),
+        ...(role ? { role } : {}),
+        ...(limit ? { limit } : {}),
       });
       res.json(result);
     } catch (err) {
@@ -201,6 +237,28 @@ export function createServer(deps: ServerDeps = {}): Express {
     try {
       const matches = await getRecentMatches.execute(identity, parsed.data.count ?? 10);
       res.json({ matches });
+    } catch (err) {
+      riotErrorResponse(res, err);
+    }
+  });
+
+  app.get('/api/player/stats', async (req: Request, res: Response) => {
+    if (!getPlayerStats) {
+      res.status(503).json({ error: 'riot_not_configured' });
+      return;
+    }
+    const parsed = identityQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
+    if (!identity) {
+      res.status(400).json({ error: 'identity_unavailable' });
+      return;
+    }
+    try {
+      res.json(await getPlayerStats.execute(identity, parsed.data.count ?? 20));
     } catch (err) {
       riotErrorResponse(res, err);
     }
