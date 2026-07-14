@@ -23,6 +23,7 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Champion select (rol asignado, campeón elegido, bans) | ✅ Implementado |
 | Tipo de partida (casual/normal/ranked/flex/práctica/…) | ✅ Implementado |
 | Recomendaciones de campeones por rol (reglas) | ✅ Implementado |
+| Análisis de composición ARAM + mejor opción de banca | ✅ Implementado |
 | Perfil / historial (Riot API) | 🚧 Stub (501) |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
@@ -104,6 +105,30 @@ curl "http://127.0.0.1:3535/api/recommendations?role=MIDDLE&limit=3"
 # {"role":"MIDDLE","recommendations":[
 #   {"championId":103,"championName":"Ahri","score":80,"reason":"meta_pick"}, ...]}
 ```
+
+`/api/aram/analysis` (sólo en ARAM, normal o de evento) lee tu equipo y la **banca**
+de campeones, analiza la **composición** (mezcla AD/AP, frontline, sustain/curación,
+CC, poke), dice si está **equilibrada o qué le falta**, y recomienda la **mejor opción**
+disponible (tu campeón actual o uno de la banca) para cubrir los huecos del equipo:
+
+```jsonc
+{
+  "isAram": true,
+  "currentComp": {
+    "balanced": false,
+    "missing": ["daño mágico (equipo demasiado AD)", "un frontline / tanque", "sustain o curación (clave en ARAM)"],
+    "strengths": ["composición de poke fuerte"]
+  },
+  "bestOption": {
+    "championId": 54, "championName": "Malphite", "fitScore": 100,
+    "fillsGaps": ["aporta daño mágico", "aporta frontline", "aporta engage"]
+  }
+  // ...team, bench, options
+}
+```
+
+> Cobertura: el análisis usa un dataset curado de campeones. Los que aún no estén
+> en el dataset se marcan con `"unknown": true` y no se evalúan (se informa aparte).
 
 Durante champion select, `/api/champ-select/session` devuelve `active:true` con el
 rol asignado, el campeón elegido, si el pick está confirmado y los bans:

@@ -4,17 +4,23 @@ import { GetClientStatusUseCase } from '../application/get-client-status.js';
 import { GetChampSelectSessionUseCase } from '../application/get-champ-select-session.js';
 import { GetGameQueueUseCase } from '../application/get-game-queue.js';
 import { GetChampionRecommendationsUseCase } from '../application/get-champion-recommendations.js';
+import { GetAramAnalysisUseCase } from '../application/get-aram-analysis.js';
 import { ClientDetector } from '../infrastructure/lcu/client-detector.js';
 import { ChampSelectReader } from '../infrastructure/lcu/champ-select.js';
 import { GameQueueDetector } from '../infrastructure/lcu/game-queue.js';
+import { AramReader } from '../infrastructure/lcu/aram-reader.js';
 import { SeedChampionPool } from '../infrastructure/champions/seed-champion-pool.js';
+import { SeedChampionTraitProvider } from '../infrastructure/champions/champion-traits.js';
 import type { ChampionPool } from '../domain/recommendation.js';
+import type { ChampionTraitProvider } from '../domain/aram.js';
 
 export interface ServerDeps {
   detector?: ClientDetector;
   champSelectReader?: ChampSelectReader;
   gameQueueDetector?: GameQueueDetector;
   championPool?: ChampionPool;
+  aramReader?: AramReader;
+  championTraits?: ChampionTraitProvider;
 }
 
 const recommendationsQuerySchema = z.object({
@@ -32,6 +38,8 @@ export function createServer(deps: ServerDeps = {}): Express {
   const champSelectReader = deps.champSelectReader ?? new ChampSelectReader();
   const gameQueueDetector = deps.gameQueueDetector ?? new GameQueueDetector();
   const championPool = deps.championPool ?? new SeedChampionPool();
+  const aramReader = deps.aramReader ?? new AramReader();
+  const championTraits = deps.championTraits ?? new SeedChampionTraitProvider();
   const getClientStatus = new GetClientStatusUseCase(detector);
   const getChampSelectSession = new GetChampSelectSessionUseCase(champSelectReader);
   const getGameQueue = new GetGameQueueUseCase(gameQueueDetector);
@@ -39,6 +47,7 @@ export function createServer(deps: ServerDeps = {}): Express {
     championPool,
     champSelectReader,
   );
+  const getAramAnalysis = new GetAramAnalysisUseCase(aramReader, championTraits);
 
   const app = express();
   app.use(express.json());
@@ -96,6 +105,15 @@ export function createServer(deps: ServerDeps = {}): Express {
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: 'recommendations_failed', message: String(err) });
+    }
+  });
+
+  app.get('/api/aram/analysis', async (_req: Request, res: Response) => {
+    try {
+      const analysis = await getAramAnalysis.execute();
+      res.json(analysis);
+    } catch (err) {
+      res.status(500).json({ error: 'aram_analysis_failed', message: String(err) });
     }
   });
 

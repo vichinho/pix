@@ -25,6 +25,10 @@ export interface ChampSelectSessionDto {
   timer?: {
     phase?: string;
   };
+  /** ARAM: ¿hay banca de campeones para intercambiar? */
+  benchEnabled?: boolean;
+  /** ARAM: campeones disponibles en la banca. */
+  benchChampions?: Array<{ championId?: number }>;
 }
 
 /** Traduce la posición asignada del LCU (minúsculas) a nuestro Role. */
