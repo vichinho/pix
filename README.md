@@ -1,0 +1,90 @@
+# LoL Companion
+
+Companion app personal para **League of Legends**. Detecta el estado del cliente,
+muestra perfil e historial reciente y asiste durante champion select con
+recomendaciones de campeones y builds por línea.
+
+Este repositorio contiene el **núcleo backend** del proyecto (Fase 0 → Fase 1 de la
+[especificación](docs/architecture.md)). El primer módulo implementado por completo
+es la **detección del cliente** (LCU), con contratos tipados, API local y tests.
+
+> **Aviso legal:** LoL Companion es un proyecto personal **no oficial**. No está
+> afiliado, asociado, autorizado ni patrocinado por Riot Games. League of Legends
+> y Riot Games son marcas registradas de Riot Games, Inc. La app es una herramienta
+> de apoyo visual y consulta: no lee memoria del juego, no inyecta código, no
+> automatiza decisiones ni acciones dentro de la partida.
+
+## Estado actual
+
+| Módulo | Estado |
+|---|---|
+| Detección del cliente (LCU lockfile + gameflow phase) | ✅ Implementado |
+| API local (`/api/client/status`) | ✅ Implementado |
+| Perfil / historial (Riot API) | 🚧 Stub (501) |
+| Champion select | 🚧 Stub (501) |
+| Recomendaciones | 🚧 Stub (501) |
+| Builds | 🚧 Stub (501) |
+| Settings | 🚧 Stub (501) |
+
+## Stack
+
+- Node.js + TypeScript (ESM)
+- Express (backend local)
+- Zod (validación de configuración y contratos)
+- Vitest (tests)
+
+La UI (React + Vite) y el shell de escritorio (Electron) se incorporarán en fases
+posteriores; el backend está diseñado para ser consumido por esa UI vía HTTP local.
+
+## Cómo funciona la detección del cliente
+
+Mientras el cliente de LoL está abierto, escribe un archivo `lockfile` con el
+formato `LeagueClient:<pid>:<port>:<password>:<protocol>`. El backend:
+
+1. Localiza el `lockfile` según el SO (o vía `LOL_LOCKFILE_PATH`).
+2. Lo parsea para obtener puerto y credenciales locales (`src/infrastructure/lcu/lockfile.ts`).
+3. Se conecta al LCU en `127.0.0.1` con basic-auth (usuario `riot`) sobre el
+   certificado autofirmado de Riot (`lcu-connector.ts`).
+4. Consulta `/lol-gameflow/v1/gameflow-phase` y `/lol-summoner/v1/current-summoner`
+   y consolida un `ClientStatus` tolerante a fallos (`client-detector.ts`).
+
+Si el cliente está cerrado, `/api/client/status` responde `DISCONNECTED` sin errores.
+
+## Uso
+
+```bash
+npm install
+cp .env.example .env      # configura RIOT_API_KEY, región, etc.
+
+npm run dev               # backend en modo watch
+npm run typecheck
+npm test
+```
+
+Ejemplo de respuesta con el cliente cerrado:
+
+```bash
+curl http://127.0.0.1:3535/api/client/status
+# {"connected":false,"clientState":"DISCONNECTED","summoner":null,"lastUpdated":"..."}
+```
+
+## Estructura
+
+```text
+src/
+├─ domain/            # Contratos/entidades compartidas (types.ts)
+├─ application/       # Casos de uso (get-client-status.ts)
+├─ infrastructure/
+│  └─ lcu/            # Lockfile, conector y detector del cliente
+├─ api/               # Servidor Express y rutas locales
+├─ config/            # Carga y validación de configuración (Zod)
+└─ index.ts           # Punto de entrada del backend
+tests/                # Tests unitarios (Vitest)
+docs/                 # Arquitectura y decisiones
+```
+
+## Próximos pasos
+
+Según el roadmap de la especificación: integrar Riot API (perfil + historial),
+lectura de la sesión de champion select, motor de recomendaciones por reglas y
+proveedor de builds con fallback local.
