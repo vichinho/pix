@@ -20,8 +20,8 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 |---|---|
 | Detección del cliente (LCU lockfile + gameflow phase) | ✅ Implementado |
 | API local (`/api/client/status`) | ✅ Implementado |
+| Champion select (rol asignado, campeón elegido, bans) | ✅ Implementado |
 | Perfil / historial (Riot API) | 🚧 Stub (501) |
-| Champion select | 🚧 Stub (501) |
 | Recomendaciones | 🚧 Stub (501) |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
@@ -61,11 +61,31 @@ npm run typecheck
 npm test
 ```
 
-Ejemplo de respuesta con el cliente cerrado:
+Ejemplos de respuesta con el cliente cerrado:
 
 ```bash
 curl http://127.0.0.1:3535/api/client/status
 # {"connected":false,"clientState":"DISCONNECTED","summoner":null,"lastUpdated":"..."}
+
+curl http://127.0.0.1:3535/api/champ-select/session
+# {"active":false,"session":null}
+```
+
+Durante champion select, `/api/champ-select/session` devuelve `active:true` con el
+rol asignado, el campeón elegido, si el pick está confirmado y los bans:
+
+```json
+{
+  "active": true,
+  "session": {
+    "phase": "BAN_PICK",
+    "assignedRole": "MIDDLE",
+    "localPlayerCellId": 2,
+    "selectedChampionId": 103,
+    "pickCompleted": false,
+    "bans": [17, 55]
+  }
+}
 ```
 
 ## Estructura
@@ -75,7 +95,7 @@ src/
 ├─ domain/            # Contratos/entidades compartidas (types.ts)
 ├─ application/       # Casos de uso (get-client-status.ts)
 ├─ infrastructure/
-│  └─ lcu/            # Lockfile, conector y detector del cliente
+│  └─ lcu/            # Lockfile, conector, detector y lector de champ select
 ├─ api/               # Servidor Express y rutas locales
 ├─ config/            # Carga y validación de configuración (Zod)
 └─ index.ts           # Punto de entrada del backend

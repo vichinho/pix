@@ -2,6 +2,19 @@ import https from 'node:https';
 import http from 'node:http';
 import type { LcuCredentials } from './lockfile.js';
 
+/** Error HTTP del LCU que preserva el código de estado para el que llama. */
+export class LcuHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly method: string,
+    readonly path: string,
+    readonly body: string,
+  ) {
+    super(`LCU ${method} ${path} respondió ${status}: ${body}`);
+    this.name = 'LcuHttpError';
+  }
+}
+
 /**
  * Construye el header de autorización Basic para el LCU.
  * El usuario siempre es "riot" y el password viene del lockfile.
@@ -69,7 +82,7 @@ export class LcuConnector {
             const raw = Buffer.concat(chunks).toString('utf8');
             const status = res.statusCode ?? 0;
             if (status < 200 || status >= 300) {
-              reject(new Error(`LCU ${method} ${path} respondió ${status}: ${raw}`));
+              reject(new LcuHttpError(status, method, path, raw));
               return;
             }
             if (raw.length === 0) {

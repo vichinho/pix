@@ -34,6 +34,33 @@ export interface ClientStatus {
   lastUpdated: string;
 }
 
+/** Fase de la sesión de champion select. */
+export type ChampSelectPhase =
+  | 'PLANNING'
+  | 'BAN_PICK'
+  | 'FINALIZATION'
+  | 'GAME_STARTING'
+  | 'UNKNOWN';
+
+/**
+ * Instantánea de la sesión de champion select, centrada en el jugador local.
+ * Contrato: GET /api/champ-select/session.
+ */
+export interface ChampSelectSnapshot {
+  /** Fase actual de la selección. */
+  phase: ChampSelectPhase;
+  /** Rol/línea asignado al jugador local (UNKNOWN si es blind/no asignado). */
+  assignedRole: Role;
+  /** cellId del jugador local dentro de la sesión. */
+  localPlayerCellId: number;
+  /** Campeón elegido/hovering por el jugador local (null si aún no elige). */
+  selectedChampionId: number | null;
+  /** ¿El pick del jugador local está confirmado (locked in)? */
+  pickCompleted: boolean;
+  /** championIds baneados en la partida (ambos equipos). */
+  bans: number[];
+}
+
 /** Recomendación individual de campeón. */
 export interface ChampionRecommendation {
   championId: number;
