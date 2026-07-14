@@ -88,8 +88,26 @@ describe('classifyGameflowSession', () => {
     expect(info.isPracticeTool).toBe(false);
   });
 
-  it('queueId desconocido cae en OTHER conservando el nombre', () => {
-    const info = classifyGameflowSession(session({ id: 1700, name: 'Arena' }));
+  it('clasifica "ARAM: Mayhem" (queueId de evento) como ARAM', () => {
+    // Payload real reportado por el cliente.
+    const info = classifyGameflowSession({
+      phase: 'ChampSelect',
+      gameData: {
+        queue: { id: 2400, gameMode: 'KIWI', type: 'KIWI', name: 'ARAM: Mayhem', mapId: 12 },
+      },
+    });
+    expect(info.category).toBe('ARAM');
+    expect(info.rawName).toBe('ARAM: Mayhem');
+    expect(info.mapId).toBe(12);
+  });
+
+  it('reconoce ARAM por la Grieta Aullante aunque el queueId sea desconocido', () => {
+    const info = classifyGameflowSession(session({ id: 99999, mapId: 12, name: 'Evento ARAM' }));
+    expect(info.category).toBe('ARAM');
+  });
+
+  it('queueId desconocido en otro mapa cae en OTHER conservando el nombre', () => {
+    const info = classifyGameflowSession(session({ id: 1700, mapId: 30, name: 'Arena' }));
     expect(info.category).toBe('OTHER');
     expect(info.rawName).toBe('Arena');
   });

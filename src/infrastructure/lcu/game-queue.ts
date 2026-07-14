@@ -38,9 +38,10 @@ const QUEUE_ID_CATEGORY: Record<number, GameQueueCategory> = {
   // Clasificatorias.
   420: 'RANKED_SOLO', // Ranked Solo/Dúo
   440: 'RANKED_FLEX', // Ranked Flex
-  // ARAM.
+  // ARAM (incluye variantes de evento sobre la Grieta Aullante).
   450: 'ARAM',
   100: 'ARAM', // ARAM (Butcher's Bridge, heredado)
+  2400: 'ARAM', // ARAM: Mayhem (variante de evento)
   // Clash.
   700: 'CLASH',
   720: 'CLASH', // ARAM Clash
@@ -72,6 +73,19 @@ function isPracticeToolMode(gameMode: string | null, rawType: string | null): bo
   return gameMode === 'PRACTICETOOL' || rawType === 'PRACTICETOOL';
 }
 
+/** mapId de la Grieta Aullante (mapa de ARAM y sus variantes). */
+const HOWLING_ABYSS_MAP_ID = 12;
+
+/**
+ * Heurística para reconocer ARAM y sus variantes de evento (p.ej. "ARAM: Mayhem"),
+ * que usan queueIds rotativos no listados. Se apoya en el mapa y en el nombre.
+ */
+function isAramLike(gameMode: string | null, rawName: string | null, mapId: number | null): boolean {
+  if (mapId === HOWLING_ABYSS_MAP_ID) return true;
+  const haystack = `${gameMode ?? ''} ${rawName ?? ''}`.toUpperCase();
+  return haystack.includes('ARAM');
+}
+
 /**
  * Clasifica la sesión de gameflow en un GameQueueInfo semántico.
  * Es puro y determinístico: apto para tests.
@@ -95,6 +109,10 @@ export function classifyGameflowSession(dto: GameflowSessionDto): GameQueueInfo 
     isCustom = true; // la herramienta de práctica es una custom bajo el capó
   } else if (queueId in QUEUE_ID_CATEGORY) {
     category = QUEUE_ID_CATEGORY[queueId]!;
+    isCustom = isCustomGame;
+  } else if (isAramLike(gameMode, rawName, mapId)) {
+    // ARAM y sus variantes de evento con queueIds rotativos (p.ej. "ARAM: Mayhem").
+    category = 'ARAM';
     isCustom = isCustomGame;
   } else if (isCustomGame || queueId === 0) {
     category = 'CUSTOM';
