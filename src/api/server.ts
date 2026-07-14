@@ -5,12 +5,15 @@ import { GetChampSelectSessionUseCase } from '../application/get-champ-select-se
 import { GetGameQueueUseCase } from '../application/get-game-queue.js';
 import { GetChampionRecommendationsUseCase } from '../application/get-champion-recommendations.js';
 import { GetAramAnalysisUseCase } from '../application/get-aram-analysis.js';
+import { GetPlayerProfileUseCase, type PlayerIdentity } from '../application/get-player-profile.js';
+import { GetRecentMatchesUseCase } from '../application/get-recent-matches.js';
 import { ClientDetector } from '../infrastructure/lcu/client-detector.js';
 import { ChampSelectReader } from '../infrastructure/lcu/champ-select.js';
 import { GameQueueDetector } from '../infrastructure/lcu/game-queue.js';
 import { AramReader } from '../infrastructure/lcu/aram-reader.js';
 import { SeedChampionPool } from '../infrastructure/champions/seed-champion-pool.js';
 import { SeedChampionTraitProvider } from '../infrastructure/champions/champion-traits.js';
+import { RiotApiError, type RiotApiClient } from '../infrastructure/riot/riot-api-client.js';
 import type { ChampionPool } from '../domain/recommendation.js';
 import type { ChampionTraitProvider } from '../domain/aram.js';
 
@@ -21,12 +24,37 @@ export interface ServerDeps {
   championPool?: ChampionPool;
   aramReader?: AramReader;
   championTraits?: ChampionTraitProvider;
+  /** Cliente Riot API; si es null/ausente, las rutas de perfil/historial devuelven 503. */
+  riotClient?: RiotApiClient | null;
 }
 
 const recommendationsQuerySchema = z.object({
   role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']).optional(),
   limit: z.coerce.number().int().min(1).max(10).optional(),
 });
+
+const identityQuerySchema = z.object({
+  gameName: z.string().min(1).optional(),
+  tagLine: z.string().min(1).optional(),
+  count: z.coerce.number().int().min(1).max(20).optional(),
+});
+
+/** Traduce un error de Riot API a un status HTTP y mensaje para el cliente local. */
+function riotErrorResponse(res: Response, err: unknown): void {
+  if (err instanceof RiotApiError) {
+    const map: Record<number, string> = {
+      401: 'riot_api_key_invalid',
+      403: 'riot_api_key_forbidden_or_expired',
+      404: 'not_found',
+      429: 'riot_rate_limited',
+    };
+    res
+      .status(err.status === 429 ? 429 : err.status >= 500 ? 502 : 400)
+      .json({ error: map[err.status] ?? 'riot_api_error', status: err.status });
+    return;
+  }
+  res.status(500).json({ error: 'internal_error', message: String(err) });
+}
 
 /**
  * Construye el servidor API local. Sólo el módulo de detección del cliente
@@ -48,6 +76,22 @@ export function createServer(deps: ServerDeps = {}): Express {
     champSelectReader,
   );
   const getAramAnalysis = new GetAramAnalysisUseCase(aramReader, championTraits);
+  const riotClient = deps.riotClient ?? null;
+  const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
+  const getRecentMatches = riotClient ? new GetRecentMatchesUseCase(riotClient) : null;
+
+  /** Resuelve la identidad Riot: primero de la query, luego del cliente local. */
+  async function resolveIdentity(
+    gameName: string | undefined,
+    tagLine: string | undefined,
+  ): Promise<PlayerIdentity | null> {
+    if (gameName && tagLine) return { gameName, tagLine };
+    const summoner = await detector.getCurrentSummoner();
+    if (summoner && summoner.gameName && summoner.tagLine) {
+      return { gameName: summoner.gameName, tagLine: summoner.tagLine };
+    }
+    return null;
+  }
 
   const app = express();
   app.use(express.json());
@@ -117,12 +161,55 @@ export function createServer(deps: ServerDeps = {}): Express {
     }
   });
 
+  app.get('/api/player/profile', async (req: Request, res: Response) => {
+    if (!getPlayerProfile) {
+      res.status(503).json({ error: 'riot_not_configured' });
+      return;
+    }
+    const parsed = identityQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
+    if (!identity) {
+      res.status(400).json({ error: 'identity_unavailable' });
+      return;
+    }
+    try {
+      res.json(await getPlayerProfile.execute(identity));
+    } catch (err) {
+      riotErrorResponse(res, err);
+    }
+  });
+
+  app.get('/api/player/matches', async (req: Request, res: Response) => {
+    if (!getRecentMatches) {
+      res.status(503).json({ error: 'riot_not_configured' });
+      return;
+    }
+    const parsed = identityQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
+    if (!identity) {
+      res.status(400).json({ error: 'identity_unavailable' });
+      return;
+    }
+    try {
+      const matches = await getRecentMatches.execute(identity, parsed.data.count ?? 10);
+      res.json({ matches });
+    } catch (err) {
+      riotErrorResponse(res, err);
+    }
+  });
+
   // Rutas planificadas en la especificación, aún no implementadas.
   const notImplemented = (name: string) => (_req: Request, res: Response) => {
     res.status(501).json({ error: 'not_implemented', endpoint: name });
   };
-  app.get('/api/player/profile', notImplemented('player/profile'));
-  app.get('/api/player/matches', notImplemented('player/matches'));
   app.get('/api/builds', notImplemented('builds'));
   app.get('/api/settings', notImplemented('settings'));
   app.put('/api/settings', notImplemented('settings'));

@@ -24,7 +24,7 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Tipo de partida (casual/normal/ranked/flex/práctica/…) | ✅ Implementado |
 | Recomendaciones de campeones por rol (reglas) | ✅ Implementado |
 | Análisis de composición ARAM + mejor opción de banca | ✅ Implementado |
-| Perfil / historial (Riot API) | 🚧 Stub (501) |
+| Perfil e historial de partidas (Riot API) | ✅ Implementado |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
 
@@ -106,6 +106,18 @@ curl "http://127.0.0.1:3535/api/recommendations?role=MIDDLE&limit=3"
 #   {"championId":103,"championName":"Ahri","score":80,"reason":"meta_pick"}, ...]}
 ```
 
+`/api/player/profile` y `/api/player/matches` usan la **Riot API oficial** (requieren
+`RIOT_API_KEY`). Resuelven tu identidad desde la query (`?gameName=&tagLine=`) o, si se
+omite, desde el cliente local. Sin key configurada devuelven `503 riot_not_configured`:
+
+```bash
+curl "http://127.0.0.1:3535/api/player/profile?gameName=Vishox&tagLine=LAS"
+# {"puuid":"...","gameName":"Vishox","tagLine":"LAS","summonerLevel":312,...}
+
+curl "http://127.0.0.1:3535/api/player/matches?gameName=Vishox&tagLine=LAS&count=5"
+# {"matches":[{"matchId":"LA1_1","championName":"Ahri","role":"MIDDLE","kills":8,...}]}
+```
+
 `/api/aram/analysis` (sólo en ARAM, normal o de evento) lee tu equipo y la **banca**
 de campeones, analiza la **composición** (mezcla AD/AP, frontline, sustain/curación,
 CC, poke), dice si está **equilibrada o qué le falta**, y recomienda la **mejor opción**
@@ -154,7 +166,9 @@ src/
 ├─ domain/            # Contratos/entidades compartidas (types.ts)
 ├─ application/       # Casos de uso (get-client-status.ts)
 ├─ infrastructure/
-│  └─ lcu/            # Lockfile, conector, detector y lector de champ select
+│  ├─ lcu/            # Lockfile, conector, detector, champ select, ARAM, cola
+│  ├─ riot/           # Cliente de la Riot API (account, summoner, match)
+│  └─ champions/      # Seed de pool y metadatos de campeones
 ├─ api/               # Servidor Express y rutas locales
 ├─ config/            # Carga y validación de configuración (Zod)
 └─ index.ts           # Punto de entrada del backend

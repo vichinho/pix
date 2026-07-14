@@ -26,6 +26,31 @@ export interface SummonerSummary {
   profileIconId?: number;
 }
 
+/** Perfil del jugador resuelto vía Riot API (GET /api/player/profile). */
+export interface PlayerProfile {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  summonerLevel: number | null;
+  profileIconId: number | null;
+  region: string;
+}
+
+/** Resumen de una partida reciente (GET /api/player/matches). */
+export interface MatchSummary {
+  matchId: string;
+  queueId: number;
+  championId: number;
+  championName: string;
+  role: Role;
+  kills: number;
+  deaths: number;
+  assists: number;
+  win: boolean;
+  durationSec: number;
+  playedAt: string;
+}
+
 /** Contrato: estado del cliente (GET /api/client/status). */
 export interface ClientStatus {
   connected: boolean;
