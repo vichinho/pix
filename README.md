@@ -22,8 +22,8 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | API local (`/api/client/status`) | ✅ Implementado |
 | Champion select (rol asignado, campeón elegido, bans) | ✅ Implementado |
 | Tipo de partida (casual/normal/ranked/flex/práctica/…) | ✅ Implementado |
+| Recomendaciones de campeones por rol (reglas) | ✅ Implementado |
 | Perfil / historial (Riot API) | 🚧 Stub (501) |
-| Recomendaciones | 🚧 Stub (501) |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
 
@@ -93,6 +93,16 @@ cliente. Categorías: `CASUAL_SWIFTPLAY` (eliges rol y campeón en la sala),
     "rawType": "RANKED_SOLO_5x5"
   }
 }
+```
+
+`/api/recommendations` sugiere campeones por línea con un motor de reglas
+determinístico (base de meta + bono por comfort pick). Si no se pasa `?role=`,
+intenta detectar el rol desde champion select y excluye los campeones baneados:
+
+```bash
+curl "http://127.0.0.1:3535/api/recommendations?role=MIDDLE&limit=3"
+# {"role":"MIDDLE","recommendations":[
+#   {"championId":103,"championName":"Ahri","score":80,"reason":"meta_pick"}, ...]}
 ```
 
 Durante champion select, `/api/champ-select/session` devuelve `active:true` con el
