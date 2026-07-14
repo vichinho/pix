@@ -57,6 +57,88 @@ describe('RiotApiClient', () => {
   });
 });
 
+describe('RiotApiClient rate limiting y cache', () => {
+  it('reintenta ante 429 respetando el intento y luego resuelve', async () => {
+    let calls = 0;
+    const fetchImpl: FetchLike = async () => {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          status: 429,
+          ok: false,
+          text: async () => 'rate limited',
+          headers: { get: (n) => (n === 'Retry-After' ? '0' : null) },
+        };
+      }
+      return { status: 200, ok: true, text: async () => JSON.stringify(['LA1_1']) };
+    };
+    const c = new RiotApiClient({
+      apiKey: 'k',
+      platform: 'la1',
+      region: 'americas',
+      fetchImpl,
+      sleepImpl: async () => {},
+    });
+    const ids = await c.getMatchIdsByPuuid('PUUID', 1);
+    expect(ids).toEqual(['LA1_1']);
+    expect(calls).toBe(2);
+  });
+
+  it('lanza 429 tras agotar los reintentos', async () => {
+    const fetchImpl: FetchLike = async () => ({
+      status: 429,
+      ok: false,
+      text: async () => 'rate limited',
+      headers: { get: () => '0' },
+    });
+    const c = new RiotApiClient({
+      apiKey: 'k',
+      platform: 'la1',
+      region: 'americas',
+      fetchImpl,
+      sleepImpl: async () => {},
+      maxRetries: 2,
+    });
+    await expect(c.getMatchIdsByPuuid('PUUID', 1)).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('cachea partidas: no repite fetch del mismo matchId', async () => {
+    let calls = 0;
+    const fetchImpl: FetchLike = async () => {
+      calls += 1;
+      return {
+        status: 200,
+        ok: true,
+        text: async () => JSON.stringify({ metadata: { matchId: 'LA1_1' }, info: {} }),
+      };
+    };
+    const c = new RiotApiClient({ apiKey: 'k', platform: 'la1', region: 'americas', fetchImpl });
+    await c.getMatch('LA1_1');
+    await c.getMatch('LA1_1');
+    expect(calls).toBe(1);
+  });
+
+  it('getMatches preserva el orden de los ids', async () => {
+    const fetchImpl: FetchLike = async (url) => {
+      const id = url.split('/matches/')[1] ?? '';
+      return {
+        status: 200,
+        ok: true,
+        text: async () => JSON.stringify({ metadata: { matchId: id }, info: {} }),
+      };
+    };
+    const c = new RiotApiClient({
+      apiKey: 'k',
+      platform: 'la1',
+      region: 'americas',
+      fetchImpl,
+      matchConcurrency: 2,
+    });
+    const matches = await c.getMatches(['A', 'B', 'C', 'D', 'E']);
+    expect(matches.map((m) => m.metadata.matchId)).toEqual(['A', 'B', 'C', 'D', 'E']);
+  });
+});
+
 describe('GetPlayerProfileUseCase', () => {
   it('combina account-v1 y summoner-v4', async () => {
     const c = client(

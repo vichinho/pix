@@ -14,7 +14,7 @@ export class GetRecentMatchesUseCase {
     const account = await this.riot.getAccountByRiotId(identity.gameName, identity.tagLine);
     const matchIds = await this.riot.getMatchIdsByPuuid(account.puuid, count);
 
-    const matches = await Promise.all(matchIds.map((id) => this.riot.getMatch(id)));
+    const matches = await this.riot.getMatches(matchIds);
     return matches
       .map((match) => this.toSummary(match, account.puuid))
       .filter((m): m is MatchSummary => m !== null);
