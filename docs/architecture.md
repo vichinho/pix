@@ -28,6 +28,7 @@ fallos) sin un cliente de LoL real, usando un conector falso.
 | GET | `/api/player/profile` | 🚧 501 |
 | GET | `/api/player/matches` | 🚧 501 |
 | GET | `/api/champ-select/session` | ✅ |
+| GET | `/api/game/queue` | ✅ |
 | GET | `/api/recommendations?role=TOP` | 🚧 501 |
 | GET | `/api/builds?championId=24&role=TOP` | 🚧 501 |
 | GET · PUT | `/api/settings` | 🚧 501 |

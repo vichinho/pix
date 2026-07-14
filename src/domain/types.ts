@@ -61,6 +61,51 @@ export interface ChampSelectSnapshot {
   bans: number[];
 }
 
+/**
+ * Categoría semántica del tipo de partida, derivada del queueId del cliente.
+ * - CASUAL_SWIFTPLAY: eliges rol y campeón en la sala, sin fase de bloqueos (Swiftplay/Quickplay).
+ * - NORMAL_DRAFT: normal/"reclutamiento", champ select con picks y bans.
+ */
+export type GameQueueCategory =
+  | 'CASUAL_SWIFTPLAY'
+  | 'NORMAL_DRAFT'
+  | 'RANKED_SOLO'
+  | 'RANKED_FLEX'
+  | 'ARAM'
+  | 'CO_OP_VS_AI'
+  | 'CLASH'
+  | 'PRACTICE_TOOL'
+  | 'CUSTOM'
+  | 'OTHER'
+  | 'UNKNOWN';
+
+/**
+ * Información del tipo de partida en curso o en preparación.
+ * Contrato: GET /api/game/queue.
+ */
+export interface GameQueueInfo {
+  /** queueId de Riot (-1/0 si no aplica). */
+  queueId: number;
+  /** Categoría semántica clasificada. */
+  category: GameQueueCategory;
+  /** Etiqueta legible en español para la UI. */
+  label: string;
+  /** ¿Es una cola clasificatoria (solo/dúo o flex)? */
+  isRanked: boolean;
+  /** ¿Es la Herramienta de práctica? */
+  isPracticeTool: boolean;
+  /** ¿Es una partida personalizada (custom, no matchmaking)? */
+  isCustom: boolean;
+  /** gameMode reportado por el cliente (CLASSIC, ARAM, PRACTICETOOL, …). */
+  gameMode: string | null;
+  /** mapId de la partida. */
+  mapId: number | null;
+  /** Nombre localizado de la cola tal como lo reporta el cliente. */
+  rawName: string | null;
+  /** Tipo de cola crudo del cliente (p.ej. RANKED_SOLO_5x5). */
+  rawType: string | null;
+}
+
 /** Recomendación individual de campeón. */
 export interface ChampionRecommendation {
   championId: number;

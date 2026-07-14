@@ -21,6 +21,7 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Detección del cliente (LCU lockfile + gameflow phase) | ✅ Implementado |
 | API local (`/api/client/status`) | ✅ Implementado |
 | Champion select (rol asignado, campeón elegido, bans) | ✅ Implementado |
+| Tipo de partida (casual/normal/ranked/flex/práctica/…) | ✅ Implementado |
 | Perfil / historial (Riot API) | 🚧 Stub (501) |
 | Recomendaciones | 🚧 Stub (501) |
 | Builds | 🚧 Stub (501) |
@@ -69,6 +70,29 @@ curl http://127.0.0.1:3535/api/client/status
 
 curl http://127.0.0.1:3535/api/champ-select/session
 # {"active":false,"session":null}
+```
+
+`/api/game/queue` clasifica el tipo de partida a partir del `queueId` que reporta el
+cliente. Categorías: `CASUAL_SWIFTPLAY` (eliges rol y campeón en la sala),
+`NORMAL_DRAFT` (normal/reclutamiento con picks y bans), `RANKED_SOLO`, `RANKED_FLEX`,
+`ARAM`, `CO_OP_VS_AI`, `CLASH`, `PRACTICE_TOOL`, `CUSTOM` y `OTHER`:
+
+```json
+{
+  "active": true,
+  "queue": {
+    "queueId": 420,
+    "category": "RANKED_SOLO",
+    "label": "Clasificatoria Solo/Dúo",
+    "isRanked": true,
+    "isPracticeTool": false,
+    "isCustom": false,
+    "gameMode": "CLASSIC",
+    "mapId": 11,
+    "rawName": "Clasificatoria Solo/Dúo",
+    "rawType": "RANKED_SOLO_5x5"
+  }
+}
 ```
 
 Durante champion select, `/api/champ-select/session` devuelve `active:true` con el
