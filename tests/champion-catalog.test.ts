@@ -79,13 +79,14 @@ describe('ArchetypeBuildProvider', () => {
     const b = provider.getBuild(101, 'MIDDLE'); // Xerath = AP
     expect(b).not.toBeNull();
     expect(b?.source).toBe('archetype');
-    expect(b?.runes.keystone).toBe('Cometa Arcano');
+    expect(b?.runes.keystoneId).toBe(8229); // Cometa Arcano
     expect(b?.summonerSpells).toContain('Flash');
   });
 
   it('usa runas AD para campeones AD', () => {
     const b = provider.getBuild(122, 'TOP'); // Darius = AD
-    expect(b?.runes.primaryStyle).toBe('Precisión');
+    expect(b?.runes.primaryStyleId).toBe(8000); // Precisión
+    expect(b?.runes.keystoneId).toBe(8010); // Conquistador
   });
 
   it('devuelve null si no hay metadatos del campeón', () => {
@@ -114,7 +115,7 @@ describe('CatalogArchetypeBuildProvider', () => {
     const provider = new CatalogArchetypeBuildProvider(catalog);
     const build = provider.getBuild(22, 'BOTTOM'); // Ashe = AD (Marksman)
     expect(build?.championName).toBe('Ashe');
-    expect(build?.runes.primaryStyle).toBe('Precisión');
+    expect(build?.runes.primaryStyleId).toBe(8000); // Precisión
     expect(build?.summonerSpells).toContain('Curación');
   });
 

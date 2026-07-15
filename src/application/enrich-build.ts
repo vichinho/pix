@@ -1,6 +1,7 @@
-import type { ChampionBuild, RuneSelection, Role } from '../domain/types.js';
+import type { ChampionBuild, Role } from '../domain/types.js';
 import type { ChampionCatalog } from '../infrastructure/champions/champion-catalog.js';
 import { summonerImageFile } from '../infrastructure/champions/summoner-assets.js';
+import { SHARD_META } from '../infrastructure/champions/rune-ids.js';
 
 export interface EnrichedIcon {
   name: string;
@@ -15,12 +16,26 @@ export interface EnrichedAbility extends EnrichedIcon {
   letter: string;
 }
 
-/** Build con iconos resueltos (ítems, hechizos, habilidades) para la UI. */
+export interface EnrichedRune extends EnrichedIcon {
+  id: number;
+}
+
+/** Página de runas resuelta, en el orden que muestra el cliente de LoL. */
+export interface EnrichedRunes {
+  primaryStyle: EnrichedIcon;
+  secondaryStyle: EnrichedIcon;
+  keystone: EnrichedRune;
+  primary: EnrichedRune[];
+  secondary: EnrichedRune[];
+  shards: EnrichedRune[];
+}
+
+/** Build con iconos resueltos (ítems, hechizos, habilidades, runas) para la UI. */
 export interface EnrichedBuild {
   championId: number;
   championName: string;
   role: Role;
-  runes: RuneSelection;
+  runes: EnrichedRunes;
   skillOrder: string[];
   source: string;
   patch: string;
@@ -47,11 +62,13 @@ export async function enrichBuild(
 ): Promise<EnrichedBuild> {
   const data = await catalog.getData();
   await catalog.ensureItems();
+  await catalog.ensureRunes();
   const spells = await catalog.getChampionSpells(build.championId);
 
   const itemBase = data?.itemIconBase ?? null;
   const spellBase = data?.spellIconBase ?? null;
   const passiveBase = data?.passiveIconBase ?? null;
+  const shardBase = data?.shardIconBase ?? null;
 
   const resolveItems = (ids: number[]): EnrichedItem[] =>
     ids.map((id) => {
@@ -87,11 +104,37 @@ export async function enrichBuild(
       }
     : null;
 
+  // Runas: resolvemos estilos, keystone, filas y fragmentos con su icono.
+  const resolveRune = (id: number): EnrichedRune => {
+    const r = catalog.getRuneSync(id);
+    return { id, name: r?.name ?? `#${id}`, icon: r?.icon ?? null };
+  };
+  const resolveStyle = (id: number): EnrichedIcon => {
+    const s = catalog.getRuneStyleSync(id);
+    return { name: s?.name ?? `#${id}`, icon: s?.icon ?? null };
+  };
+  const resolveShard = (id: number): EnrichedRune => {
+    const meta = SHARD_META[id];
+    return {
+      id,
+      name: meta?.name ?? `#${id}`,
+      icon: meta && shardBase ? `${shardBase}${meta.file}` : null,
+    };
+  };
+  const runes: EnrichedRunes = {
+    primaryStyle: resolveStyle(build.runes.primaryStyleId),
+    secondaryStyle: resolveStyle(build.runes.secondaryStyleId),
+    keystone: resolveRune(build.runes.keystoneId),
+    primary: build.runes.primary.map(resolveRune),
+    secondary: build.runes.secondary.map(resolveRune),
+    shards: build.runes.shards.map(resolveShard),
+  };
+
   return {
     championId: build.championId,
     championName: build.championName,
     role: build.role,
-    runes: build.runes,
+    runes,
     skillOrder: build.skillOrder,
     source: build.source,
     patch: build.patch,

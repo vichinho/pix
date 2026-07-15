@@ -145,14 +145,18 @@ export interface RecommendationsResponse {
   recommendations: ChampionRecommendation[];
 }
 
-/** Página de runas legible. */
+/** Página de runas referenciada por IDs de Data Dragon (se resuelven a
+ * icono/nombre en la capa de API). */
 export interface RuneSelection {
-  primaryStyle: string;
-  keystone: string;
-  primary: string[];
-  secondaryStyle: string;
-  secondary: string[];
-  shards: string[];
+  primaryStyleId: number;
+  secondaryStyleId: number;
+  keystoneId: number;
+  /** 3 runas del árbol primario (filas 1-3), en orden. */
+  primary: number[];
+  /** 2 runas del árbol secundario, en orden. */
+  secondary: number[];
+  /** 3 fragmentos (ofensivo, flexible, defensivo). */
+  shards: number[];
 }
 
 /** Contrato interno de build: ítems como IDs de Data Dragon (se resuelven a

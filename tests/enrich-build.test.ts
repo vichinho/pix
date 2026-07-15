@@ -41,11 +41,32 @@ const xerathDetail = {
   },
 };
 
+const runesJson = [
+  {
+    id: 8200, key: 'Sorcery', name: 'Brujería', icon: 'perk-images/Styles/7202_Sorcery.png',
+    slots: [
+      { runes: [{ id: 8229, name: 'Cometa Arcano', icon: 'perk-images/Styles/Sorcery/ArcaneComet/ArcaneComet.png' }] },
+      { runes: [{ id: 8226, name: 'Flujo de Maná', icon: 'perk-images/Styles/Sorcery/ManaflowBand/ManaflowBand.png' }] },
+      { runes: [{ id: 8210, name: 'Trascendencia', icon: 'perk-images/Styles/Sorcery/Transcendence/Transcendence.png' }] },
+      { runes: [{ id: 8237, name: 'Chamuscar', icon: 'perk-images/Styles/Sorcery/Scorch/Scorch.png' }] },
+    ],
+  },
+  {
+    id: 8300, key: 'Inspiration', name: 'Inspiración', icon: 'perk-images/Styles/7203_Whimsy.png',
+    slots: [
+      { runes: [] },
+      { runes: [{ id: 8321, name: 'Reparto de Galletas', icon: 'perk-images/Styles/Inspiration/BiscuitDelivery/BiscuitDelivery.png' }] },
+      { runes: [{ id: 8347, name: 'Perspicacia Cósmica', icon: 'perk-images/Styles/Inspiration/CosmicInsight/CosmicInsight.png' }] },
+    ],
+  },
+];
+
 function catalogFetch(): CatalogFetch {
   return async (url: string) => {
     let body: unknown = {};
     if (url.includes('versions')) body = ['14.24.1'];
     else if (url.includes('/champion/Xerath.json')) body = xerathDetail;
+    else if (url.includes('runesReforged.json')) body = runesJson;
     else if (url.includes('champion.json')) body = championJson;
     else if (url.includes('item.json')) body = itemJson;
     return { ok: true, status: 200, text: async () => JSON.stringify(body) };
@@ -80,6 +101,15 @@ describe('enrichBuild', () => {
     expect(enriched.abilities.map((a) => a.letter)).toEqual(['Q', 'W', 'E']);
     expect(enriched.abilities[0]?.icon).toContain('/img/spell/XerathArcanopulseChargeUp.png');
     expect(enriched.passive?.icon).toContain('/img/passive/Xerath_P.png');
+
+    // Runas resueltas: estilos, keystone, filas y fragmentos con icono.
+    expect(enriched.runes.primaryStyle.name).toBe('Brujería');
+    expect(enriched.runes.keystone.name).toBe('Cometa Arcano');
+    expect(enriched.runes.keystone.icon).toContain('/cdn/img/perk-images/Styles/Sorcery/ArcaneComet/ArcaneComet.png');
+    expect(enriched.runes.primary.map((r) => r.name)).toEqual(['Flujo de Maná', 'Trascendencia', 'Chamuscar']);
+    expect(enriched.runes.secondaryStyle.name).toBe('Inspiración');
+    expect(enriched.runes.shards).toHaveLength(3);
+    expect(enriched.runes.shards[0]?.icon).toContain('/perk-images/StatMods/');
   });
 
   it('sin catálogo (CDN caído) deja iconos en null pero conserva estructura', async () => {

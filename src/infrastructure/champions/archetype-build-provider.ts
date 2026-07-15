@@ -3,6 +3,7 @@ import type { ChampionTraitProvider, DamageType } from '../../domain/aram.js';
 import type { ChampionBuild, Role, RuneSelection } from '../../domain/types.js';
 import type { ChampionCatalog } from './champion-catalog.js';
 import { ITEM } from './item-ids.js';
+import { STYLE, KEYSTONE, RUNE, SHARD } from './rune-ids.js';
 
 /** Arma una build genérica sensata a partir del tipo de daño y el rol. */
 export function buildGeneric(
@@ -72,32 +73,32 @@ function summonersFor(role: Role, damage: DamageType): string[] {
 function runesFor(damage: DamageType): RuneSelection {
   if (damage === 'AP') {
     return {
-      primaryStyle: 'Brujería',
-      keystone: 'Cometa Arcano',
-      primary: ['Flujo de Maná', 'Trascendencia', 'Chamuscar'],
-      secondaryStyle: 'Inspiración',
-      secondary: ['Galleta Mágica', 'Perspicacia Cósmica'],
-      shards: ['Aceleración de Habilidad', 'PA Adaptativo', 'Vida'],
+      primaryStyleId: STYLE.SORCERY,
+      keystoneId: KEYSTONE.ARCANE_COMET,
+      primary: [RUNE.MANAFLOW_BAND, RUNE.TRANSCENDENCE, RUNE.SCORCH],
+      secondaryStyleId: STYLE.INSPIRATION,
+      secondary: [RUNE.BISCUIT_DELIVERY, RUNE.COSMIC_INSIGHT],
+      shards: [SHARD.ABILITY_HASTE, SHARD.ADAPTIVE, SHARD.HEALTH],
     };
   }
   if (damage === 'NONE') {
     return {
-      primaryStyle: 'Resolución',
-      keystone: 'Choque Posterior (Aftershock)',
-      primary: ['Demolición', 'Segundo Aliento', 'Sonrisa Cadavérica'],
-      secondaryStyle: 'Inspiración',
-      secondary: ['Hechizo Fantasma', 'Perspicacia Cósmica'],
-      shards: ['Aceleración de Habilidad', 'Vida', 'Vida'],
+      primaryStyleId: STYLE.RESOLVE,
+      keystoneId: KEYSTONE.AFTERSHOCK,
+      primary: [RUNE.FONT_OF_LIFE, RUNE.BONE_PLATING, RUNE.OVERGROWTH],
+      secondaryStyleId: STYLE.INSPIRATION,
+      secondary: [RUNE.MAGICAL_FOOTWEAR, RUNE.COSMIC_INSIGHT],
+      shards: [SHARD.ABILITY_HASTE, SHARD.HEALTH_SCALING, SHARD.HEALTH],
     };
   }
   // AD / MIXED
   return {
-    primaryStyle: 'Precisión',
-    keystone: 'Conquistador',
-    primary: ['Triunfo', 'Leyenda: Presteza', 'Último Aliento'],
-    secondaryStyle: 'Dominación',
-    secondary: ['Impacto Súbito', 'Cazador Voraz'],
-    shards: ['AD Adaptativo', 'AD Adaptativo', 'Vida'],
+    primaryStyleId: STYLE.PRECISION,
+    keystoneId: KEYSTONE.CONQUEROR,
+    primary: [RUNE.TRIUMPH, RUNE.LEGEND_ALACRITY, RUNE.LAST_STAND],
+    secondaryStyleId: STYLE.DOMINATION,
+    secondary: [RUNE.SUDDEN_IMPACT, RUNE.ULTIMATE_HUNTER],
+    shards: [SHARD.ADAPTIVE, SHARD.ADAPTIVE, SHARD.HEALTH],
   };
 }
 

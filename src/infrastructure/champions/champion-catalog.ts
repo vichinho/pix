@@ -34,7 +34,14 @@ export interface ChampionCatalogData {
   itemIconBase: string;
   spellIconBase: string;
   passiveIconBase: string;
+  shardIconBase: string;
   champions: ChampionCatalogEntry[];
+}
+
+/** Asset de runa/estilo con URL de icono ya resuelta. */
+export interface RuneAsset {
+  name: string;
+  icon: string;
 }
 
 export interface ItemEntry {
@@ -85,6 +92,10 @@ export class ChampionCatalog {
   private itemsLoadedAt = 0;
   private itemsInflight: Promise<void> | null = null;
   private spellCache = new Map<number, ChampionSpells>();
+  private runes = new Map<number, RuneAsset>();
+  private runeStyles = new Map<number, RuneAsset>();
+  private runesLoadedAt = 0;
+  private runesInflight: Promise<void> | null = null;
 
   constructor(opts: ChampionCatalogOptions = {}) {
     this.fetchImpl = opts.fetchImpl ?? (globalThis.fetch as unknown as CatalogFetch);
@@ -124,6 +135,7 @@ export class ChampionCatalog {
         itemIconBase: `${DDRAGON}/cdn/${version}/img/item/`,
         spellIconBase: `${DDRAGON}/cdn/${version}/img/spell/`,
         passiveIconBase: `${DDRAGON}/cdn/${version}/img/passive/`,
+        shardIconBase: `${DDRAGON}/cdn/img/perk-images/StatMods/`,
         champions: metas.map((m) => ({ id: m.id, name: m.name, image: m.image })),
       };
       this.byId = new Map(metas.map((m) => [m.id, m]));
@@ -275,6 +287,67 @@ export class ChampionCatalog {
     >;
   }> {
     return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/champion/${ddragonId}.json`);
+  }
+
+  /** Asegura cargado el árbol de runas (runesReforged.json). */
+  async ensureRunes(): Promise<void> {
+    const data = await this.getData();
+    if (!data) return;
+    const fresh = this.runes.size > 0 && Date.now() - this.runesLoadedAt < this.ttlMs;
+    if (fresh) return;
+    this.runesInflight ??= this.loadRunes(data.version).finally(() => {
+      this.runesInflight = null;
+    });
+    return this.runesInflight;
+  }
+
+  private async loadRunes(version: string): Promise<void> {
+    try {
+      const raw = await this.fetchRunes(version, this.locale).catch(() =>
+        this.locale === 'en_US' ? null : this.fetchRunes(version, 'en_US'),
+      );
+      if (!raw) return;
+      const base = `${DDRAGON}/cdn/img/`;
+      const styles = new Map<number, RuneAsset>();
+      const runes = new Map<number, RuneAsset>();
+      for (const style of raw) {
+        styles.set(style.id, { name: style.name, icon: `${base}${style.icon}` });
+        for (const slot of style.slots ?? []) {
+          for (const rune of slot.runes ?? []) {
+            runes.set(rune.id, { name: rune.name, icon: `${base}${rune.icon}` });
+          }
+        }
+      }
+      this.runeStyles = styles;
+      this.runes = runes;
+      this.runesLoadedAt = Date.now();
+    } catch {
+      // Runas no disponibles: se resolverán como id crudo.
+    }
+  }
+
+  private fetchRunes(
+    version: string,
+    locale: string,
+  ): Promise<
+    Array<{
+      id: number;
+      name: string;
+      icon: string;
+      slots?: Array<{ runes?: Array<{ id: number; name: string; icon: string }> }>;
+    }>
+  > {
+    return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/runesReforged.json`);
+  }
+
+  /** Runa (perk) por id si el árbol ya está cargado. */
+  getRuneSync(perkId: number): RuneAsset | null {
+    return this.runes.get(perkId) ?? null;
+  }
+
+  /** Estilo de runa por id si el árbol ya está cargado. */
+  getRuneStyleSync(styleId: number): RuneAsset | null {
+    return this.runeStyles.get(styleId) ?? null;
   }
 }
 

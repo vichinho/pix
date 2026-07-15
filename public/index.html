@@ -8,55 +8,47 @@
   </head>
   <body>
     <header class="topbar">
-      <div class="brand">
-        <span class="logo">⚔️</span>
-        <span>LoL Companion</span>
-      </div>
-      <div class="badges">
-        <span id="clientBadge" class="badge badge-off">Cliente: —</span>
-        <span id="riotBadge" class="badge badge-muted">Riot API: —</span>
+      <div class="brand"><span class="mark">◆</span> LoL Companion</div>
+      <div class="pills">
+        <span id="clientBadge" class="pill">Cliente</span>
+        <span id="riotBadge" class="pill">Riot API</span>
       </div>
     </header>
 
-    <main class="grid">
-      <!-- Columna izquierda: perfil, forma, estadísticas -->
-      <section class="col">
-        <div class="card" id="profileCard">
-          <h2>Perfil</h2>
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <h3>Perfil</h3>
           <div id="profileBody" class="muted">Esperando cliente o Riot API…</div>
-        </div>
-
-        <div class="card">
-          <h2>Rendimiento reciente</h2>
+        </section>
+        <section class="panel">
+          <h3>Rendimiento reciente</h3>
           <div id="statsBody" class="muted">—</div>
-        </div>
-
-        <div class="card">
-          <h2>Últimas partidas</h2>
+        </section>
+        <section class="panel">
+          <h3>Últimas partidas</h3>
           <div id="matchesBody" class="muted">—</div>
-        </div>
-      </section>
+        </section>
+      </aside>
 
-      <!-- Columna principal: contexto (champ select / ARAM / recomendaciones) -->
-      <section class="col col-main">
-        <div class="card" id="contextCard">
-          <div class="card-head">
-            <h2 id="contextTitle">Contexto</h2>
-            <span id="queueBadge" class="badge badge-muted">—</span>
+      <section class="main">
+        <div class="panel context">
+          <div class="panel-head">
+            <h3 id="contextTitle">Contexto</h3>
+            <span id="queueBadge" class="pill ghost">—</span>
           </div>
-          <div id="contextBody" class="muted">
-            Abre el cliente de LoL y entra a una partida: en <strong>selección de
-            campeón</strong> verás los campeones recomendados para tu línea y las runas
-            de tu pick; ya <strong>en partida</strong> aparecerá tu build completa.
+          <div id="contextBody" class="hint">
+            Abre el cliente de LoL y entra a una partida. En <strong>selección de
+            campeón</strong> verás los campeones recomendados para tu línea y las
+            runas de tu pick; ya <strong>en partida</strong>, tu build completa.
           </div>
         </div>
       </section>
     </main>
 
     <footer class="legal">
-      LoL Companion es un proyecto personal <strong>no oficial</strong>. No está
-      afiliado, asociado, autorizado ni patrocinado por Riot Games. League of
-      Legends y Riot Games son marcas registradas de Riot Games, Inc.
+      Proyecto personal no oficial. No afiliado, asociado, autorizado ni patrocinado por
+      Riot Games. League of Legends y Riot Games son marcas registradas de Riot Games, Inc.
     </footer>
 
     <script src="/app.js"></script>

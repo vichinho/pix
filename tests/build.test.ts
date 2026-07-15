@@ -12,7 +12,7 @@ describe('SeedBuildProvider', () => {
     expect(build).not.toBeNull();
     expect(build?.championName).toBe('Xerath');
     expect(build?.summonerSpells.length).toBeGreaterThan(0);
-    expect(build?.runes.keystone).toBeTruthy();
+    expect(build?.runes.keystoneId).toBeGreaterThan(0);
     expect(build?.coreItems.length).toBeGreaterThan(0);
     expect(build?.skillOrder).toEqual(['Q', 'W', 'E']);
     expect(build?.source).toBe('curated');
@@ -50,7 +50,7 @@ describe('FallbackBuildProvider', () => {
     championName: 'X',
     role: 'MIDDLE' as Role,
     summonerSpells: ['Flash'],
-    runes: { primaryStyle: 'a', keystone: 'k', primary: [], secondaryStyle: 'b', secondary: [], shards: [] },
+    runes: { primaryStyleId: 8200, keystoneId: 8229, primary: [], secondaryStyleId: 8300, secondary: [], shards: [] },
     startingItems: [],
     coreItems: [3089],
     situationalItems: [],

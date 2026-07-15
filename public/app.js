@@ -50,7 +50,7 @@ function iconOrText(entry, cls) {
   if (entry.icon) {
     return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" title="${esc(entry.name)}" loading="lazy"/>`;
   }
-  return `<span class="tag">${esc(entry.name)}</span>`;
+  return `<span class="tagfallback">${esc(entry.name)}</span>`;
 }
 const itemRow = (items) => (items || []).map((i) => iconOrText(i, 'iicon')).join(' ');
 const summRow = (sums) => (sums || []).map((s) => iconOrText(s, 'sicon')).join(' ');
@@ -62,7 +62,35 @@ function abilityRow(abils) {
     )
     .join('<span class="arrow">›</span>');
 }
-const runeTags = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join(' ');
+
+// Página de runas al estilo LoL: árbol primario (keystone + filas) y secundario + fragmentos.
+function runeRow(r, extraClass) {
+  const img = r.icon
+    ? `<img src="${esc(r.icon)}" alt="${esc(r.name)}" loading="lazy"/>`
+    : '<span class="tagfallback">•</span>';
+  return `<div class="rune ${extraClass || ''}">${img}<span class="rn">${esc(r.name)}</span></div>`;
+}
+function styleHead(style) {
+  const img = style.icon ? `<img src="${esc(style.icon)}" alt="" loading="lazy"/>` : '';
+  return `<div class="runestyle">${img}${esc(style.name)}</div>`;
+}
+function renderRunes(runes) {
+  const shards = (runes.shards || [])
+    .map((s) => (s.icon ? `<img src="${esc(s.icon)}" alt="${esc(s.name)}" title="${esc(s.name)}" loading="lazy"/>` : ''))
+    .join('');
+  return `<div class="runepage">
+      <div class="runecol">
+        ${styleHead(runes.primaryStyle)}
+        ${runeRow(runes.keystone, 'key')}
+        ${(runes.primary || []).map((r) => runeRow(r)).join('')}
+      </div>
+      <div class="runecol">
+        ${styleHead(runes.secondaryStyle)}
+        ${(runes.secondary || []).map((r) => runeRow(r)).join('')}
+        <div class="shards">${shards}</div>
+      </div>
+    </div>`;
+}
 
 // --- Estado de cliente y Riot ------------------------------------------
 let riotConfigured = false;
@@ -73,11 +101,11 @@ async function refreshStatus() {
   const badge = $('clientBadge');
   clientConnected = !!(data && data.connected);
   if (clientConnected) {
-    badge.textContent = `Cliente: ${stateEs(data.clientState)}`;
-    badge.className = 'badge badge-on';
+    badge.textContent = stateEs(data.clientState);
+    badge.className = 'pill on';
   } else {
-    badge.textContent = 'Cliente: desconectado';
-    badge.className = 'badge badge-off';
+    badge.textContent = 'Desconectado';
+    badge.className = 'pill off';
   }
   return data;
 }
@@ -102,18 +130,18 @@ async function refreshRiotPanels() {
   const prof = await api('/api/player/profile');
   if (prof.status === 503) {
     riotConfigured = false;
-    $('riotBadge').textContent = 'Riot API: no configurada';
-    $('riotBadge').className = 'badge badge-off';
-    $('profileBody').innerHTML = '<span class="muted">Define RIOT_API_KEY en .env para ver perfil, historial y estadísticas.</span>';
+    $('riotBadge').textContent = 'Riot API off';
+    $('riotBadge').className = 'pill off';
+    $('profileBody').innerHTML = '<span class="hint">Define RIOT_API_KEY en .env para ver perfil, historial y estadísticas.</span>';
     return;
   }
   riotConfigured = true;
-  $('riotBadge').textContent = 'Riot API: activa';
-  $('riotBadge').className = 'badge badge-on';
+  $('riotBadge').textContent = 'Riot API';
+  $('riotBadge').className = 'pill on';
 
   if (prof.ok && prof.data) {
     const p = prof.data;
-    const cached = clientConnected ? '' : ' <span class="badge badge-muted">última sesión</span>';
+    const cached = clientConnected ? '' : ' <span class="pill ghost">última sesión</span>';
     $('profileBody').innerHTML = `<div class="kv">
       <span class="k">Invocador</span><span>${esc(p.gameName)} #${esc(p.tagLine)}${cached}</span>
       <span class="k">Nivel</span><span>${esc(p.summonerLevel ?? '—')}</span>
@@ -143,7 +171,7 @@ async function refreshStats() {
   const rows = top
     .map(
       (c) => `<tr>
-        <td>${esc(c.championName)}</td>
+        <td>${champChip(c.championId, 18)}</td>
         <td>${c.games}</td>
         <td class="${c.winRate >= 0.5 ? 'win' : 'loss'}">${Math.round(c.winRate * 100)}%</td>
         <td>${c.kda}</td>
@@ -151,7 +179,7 @@ async function refreshStats() {
     )
     .join('');
   $('statsBody').innerHTML = `
-    <div class="muted" style="margin-bottom:.5rem">Últimas ${data.totalGames} · <span class="${wr >= 50 ? 'win' : 'loss'}">${wr}% WR</span> (${data.wins}V ${data.losses}D)</div>
+    <div class="summary"><span class="big ${wr >= 50 ? 'win' : 'loss'}">${wr}%</span><span>WR · ${data.wins}V ${data.losses}D · ${data.totalGames} partidas</span></div>
     <table><thead><tr><th>Campeón</th><th>P</th><th>WR</th><th>KDA</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -164,8 +192,8 @@ async function refreshMatches() {
   const rows = (data.matches || [])
     .map(
       (m) => `<tr>
-        <td>${esc(m.championName)}</td>
-        <td>${esc(ROLE_ES[m.role] || m.role)}</td>
+        <td>${champChip(m.championId, 18)}</td>
+        <td class="faint">${esc(ROLE_ES[m.role] || m.role)}</td>
         <td>${m.kills}/${m.deaths}/${m.assists}</td>
         <td class="${m.win ? 'win' : 'loss'}">${m.win ? 'V' : 'D'}</td>
       </tr>`,
@@ -183,13 +211,13 @@ function renderRecommendations(target, data) {
   const items = data.recommendations
     .map(
       (r) => `<li class="recitem">
-        <span><span class="name">${esc(r.championName)}</span> <span class="reason">${esc(reasonEs(r.reason))}</span></span>
+        <span>${champChip(r.championId, 24)}<span class="reason">${esc(reasonEs(r.reason))}</span></span>
         <span class="score">${r.score}</span>
       </li>`,
     )
     .join('');
-  const meta = data.personalized ? ` <span class="badge badge-live">personalizado · ${data.basedOnGames} partidas</span>` : '';
-  target.innerHTML = `<div class="muted" style="margin-bottom:.5rem">Rol: ${esc(ROLE_ES[data.role] || data.role)}${meta}</div><ul class="reclist">${items}</ul>`;
+  const meta = data.personalized ? ` <span class="pill live">personalizado · ${data.basedOnGames}</span>` : '';
+  target.innerHTML = `<div class="summary"><span>Rol: ${esc(ROLE_ES[data.role] || data.role)}</span>${meta}</div><ul class="reclist">${items}</ul>`;
 }
 
 function reasonEs(r) {
@@ -205,13 +233,12 @@ function renderBuild(b) {
     <div class="kv"><span class="k">Campeón</span><span>${champChip(b.championId, 22)} · ${esc(ROLE_ES[b.role] || b.role)}</span>
       <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
       <span class="k">Habilidades</span><span class="iconrow">${passive}${passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span></div>
-    <div class="build-block"><div class="label">Runas</div>
-      <div>${esc(b.runes.keystone)} <span class="muted">(${esc(b.runes.primaryStyle)})</span> — ${runeTags(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}</span> ${runeTags(b.runes.secondary)} · ${runeTags(b.runes.shards)}</div></div>
-    <div class="build-block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
-    <div class="build-block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
-    <div class="build-block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div></div>
-    ${b.notes ? `<div class="muted" style="margin-top:.5rem">💡 ${esc(b.notes)}</div>` : ''}
-    <div class="muted" style="margin-top:.4rem">Fuente: ${esc(b.source)} · ${esc(b.patch)}</div>`;
+    <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
+    <div class="block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
+    <div class="block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
+    <div class="block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div></div>
+    ${b.notes ? `<div class="note">💡 ${esc(b.notes)}</div>` : ''}
+    <div class="source-note">Fuente: ${esc(b.source)} · ${esc(b.patch)}</div>`;
 }
 
 // --- Contexto: cola, champ select, ARAM --------------------------------
@@ -220,10 +247,10 @@ async function refreshContext(clientState) {
   const qBadge = $('queueBadge');
   if (queue.ok && queue.data && queue.data.active && queue.data.queue) {
     qBadge.textContent = queue.data.queue.label;
-    qBadge.className = 'badge badge-live';
+    qBadge.className = 'pill live';
   } else {
     qBadge.textContent = '—';
-    qBadge.className = 'badge badge-muted';
+    qBadge.className = 'pill ghost';
   }
 
   const isAram = queue.ok && queue.data?.queue?.category === 'ARAM';
@@ -246,10 +273,9 @@ function renderRunesSummoners(b) {
   return `<div class="kv">
       <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
       <span class="k">Habilidades</span><span class="iconrow">${abilityRow(b.abilities)}</span>
-      <span class="k">Keystone</span><span>${esc(b.runes.keystone)} <span class="muted">(${esc(b.runes.primaryStyle)})</span></span>
     </div>
-    <div style="margin-top:.3rem">${runeTags(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}:</span> ${runeTags(b.runes.secondary)} · ${runeTags(b.runes.shards)}</div>
-    <div class="muted" style="margin-top:.35rem">Fuente: ${esc(b.source)}</div>`;
+    <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
+    <div class="source-note">Fuente: ${esc(b.source)}</div>`;
 }
 
 async function refreshChampSelect() {
@@ -277,22 +303,22 @@ async function refreshChampSelect() {
   // Runas + summoners del campeón que estás eligiendo.
   let pickHtml = '';
   if (s.selectedChampionId) {
-    const head = `${champChip(s.selectedChampionId, 30)} ${s.pickCompleted ? '<span class="pill">confirmado</span>' : '<span class="pill">eligiendo</span>'}`;
+    const head = `${champChip(s.selectedChampionId, 30)} <span class="pill ghost">${s.pickCompleted ? 'confirmado' : 'eligiendo'}</span>`;
     const b = await api(`/api/builds?championId=${s.selectedChampionId}&role=${s.assignedRole}`);
     const body = b.ok
       ? renderRunesSummoners(b.data)
       : '<span class="muted">Sin runas sugeridas para este campeón todavía.</span>';
-    pickHtml = `<div class="build-block"><div class="label">Tu campeón · runas y hechizos</div><div class="pickhead">${head}</div>${body}</div>`;
+    pickHtml = `<div class="block"><div class="label">Tu campeón · runas y hechizos</div><div class="pickhead">${head}</div>${body}</div>`;
   }
 
   $('contextBody').innerHTML = `
     <div class="kv">
       <span class="k">Rol</span><span>${esc(ROLE_ES[s.assignedRole] || s.assignedRole)}</span>
-      <span class="k">Fase</span><span>${esc(s.phase)}</span>
-      <span class="k">Bans</span><span>${(s.bans || []).map((b) => champChip(b, 18)).join(' ') || '—'}</span>
+      <span class="k">Fase</span><span class="faint">${esc(s.phase)}</span>
+      <span class="k">Bans</span><span class="iconrow">${(s.bans || []).map((b) => champChip(b, 18)).join(' ') || '—'}</span>
     </div>
     ${pickHtml}
-    <div class="build-block"><div class="label">Sugerencias para tu rol</div>${recHtml}</div>`;
+    <div class="block"><div class="label">Sugerencias para tu rol</div>${recHtml}</div>`;
 }
 
 async function refreshInGame() {
@@ -334,37 +360,37 @@ async function refreshAram() {
   }
   const comp = data.currentComp;
   const balanced = comp.balanced
-    ? '<span class="balanced-yes">✅ Equipo equilibrado</span>'
-    : '<span class="balanced-no">⚠️ Falta algo</span>';
+    ? '<span class="verdict-yes">✓ Equipo equilibrado</span>'
+    : '<span class="verdict-no">⚠ Falta algo</span>';
   const missing = (comp.missing || []).map((m) => `<span class="tag bad">${esc(m)}</span>`).join('');
   const strengths = (comp.strengths || []).map((m) => `<span class="tag good">${esc(m)}</span>`).join('');
   const team = (data.team || [])
-    .map((c) => `<span class="tag${c.isLocalPlayer ? ' good' : ''}">${esc(c.championName)}${c.isLocalPlayer ? ' (tú)' : ''}</span>`)
-    .join('');
-  const bench = (data.bench || []).map((c) => `<span class="tag">${esc(c.championName)}</span>`).join('') || '<span class="muted">—</span>';
+    .map((c) => `<span class="chip">${champChip(c.championId, 22)}${c.isLocalPlayer ? ' <span class="pill ghost">tú</span>' : ''}</span>`)
+    .join(' ');
+  const bench = (data.bench || []).map((c) => champChip(c.championId, 22)).join(' ') || '<span class="muted">—</span>';
 
   let best = '<span class="muted">—</span>';
   if (data.bestOption) {
     const o = data.bestOption;
-    best = `<span class="name">${esc(o.championName)}</span> <span class="score">${o.fitScore}</span> ${(o.fillsGaps || [])
+    best = `${champChip(o.championId, 26)} <span class="score">${o.fitScore}</span> ${(o.fillsGaps || [])
       .map((g) => `<span class="tag good">${esc(g)}</span>`)
       .join('')}`;
   }
   const options = (data.options || [])
-    .map((o) => `<li class="recitem"><span class="name">${esc(o.championName)}</span><span class="score">${o.fitScore}</span></li>`)
+    .map((o) => `<li class="recitem"><span>${champChip(o.championId, 24)}</span><span class="score">${o.fitScore}</span></li>`)
     .join('');
 
   $('contextBody').innerHTML = `
-    <div style="margin-bottom:.5rem">${balanced}</div>
+    <div class="summary">${balanced}</div>
     <div class="kv">
-      <span class="k">Equipo</span><span>${team}</span>
-      <span class="k">Banca</span><span>${bench}</span>
-      <span class="k">Mezcla</span><span>${comp.adCount} AD · ${comp.apCount} AP · frontline ${comp.frontlineCount} · sustain ${comp.sustainCount} · CC ${comp.hardCcCount}</span>
+      <span class="k">Equipo</span><span class="iconrow">${team}</span>
+      <span class="k">Banca</span><span class="iconrow">${bench}</span>
+      <span class="k">Mezcla</span><span class="faint">${comp.adCount} AD · ${comp.apCount} AP · frontline ${comp.frontlineCount} · sustain ${comp.sustainCount} · CC ${comp.hardCcCount}</span>
     </div>
-    ${missing ? `<div class="build-block"><div class="label">Le falta</div><div>${missing}</div></div>` : ''}
-    ${strengths ? `<div class="build-block"><div class="label">Fortalezas</div><div>${strengths}</div></div>` : ''}
-    <div class="build-block"><div class="label">Mejor elección de tu banca</div><div class="recitem">${best}</div></div>
-    ${options ? `<div class="build-block"><div class="label">Opciones (tú + banca)</div><ul class="reclist">${options}</ul></div>` : ''}`;
+    ${missing ? `<div class="block"><div class="label">Le falta</div><div>${missing}</div></div>` : ''}
+    ${strengths ? `<div class="block"><div class="label">Fortalezas</div><div>${strengths}</div></div>` : ''}
+    <div class="block"><div class="label">Mejor elección de tu banca</div><div class="recitem">${best}</div></div>
+    ${options ? `<div class="block"><div class="label">Opciones (tú + banca)</div><ul class="reclist">${options}</ul></div>` : ''}`;
 }
 
 // --- Bucle de refresco --------------------------------------------------
