@@ -31,6 +31,7 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Interfaz web (dashboard) servida por el backend | ✅ Implementado |
 | Catálogo de campeones (nombre/icono, Data Dragon) | ✅ Implementado |
 | Runas + hechizos del campeón en champ select · build in-game | ✅ Implementado |
+| Detección del campeón en partida (Live Client API) | ✅ Implementado |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
 

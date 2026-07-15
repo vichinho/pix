@@ -16,8 +16,15 @@ export interface ChampionCatalogEntry {
 
 /** Metadatos internos incluyendo tipo de daño inferido de Data Dragon. */
 export interface ChampionMeta extends ChampionCatalogEntry {
+  /** id de Data Dragon (p.ej. "Xerath", "MonkeyKing"). */
+  ddragonId: string;
   tags: string[];
   damage: DamageType;
+}
+
+/** Normaliza un nombre para comparaciones laxas. */
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 export interface ChampionCatalogData {
@@ -47,6 +54,8 @@ export class ChampionCatalog {
   private readonly ttlMs: number;
   private data: ChampionCatalogData | null = null;
   private byId = new Map<number, ChampionMeta>();
+  private byName = new Map<string, number>();
+  private byDdragonId = new Map<string, number>();
   private loadedAt = 0;
   private inflight: Promise<ChampionCatalogData | null> | null = null;
 
@@ -77,6 +86,7 @@ export class ChampionCatalog {
         id: Number(c.key),
         name: c.name,
         image: c.image.full,
+        ddragonId: c.id,
         tags: c.tags ?? [],
         damage: inferDamage(c.tags ?? [], c.info),
       }));
@@ -87,6 +97,8 @@ export class ChampionCatalog {
         champions: metas.map((m) => ({ id: m.id, name: m.name, image: m.image })),
       };
       this.byId = new Map(metas.map((m) => [m.id, m]));
+      this.byName = new Map(metas.map((m) => [normalizeName(m.name), m.id]));
+      this.byDdragonId = new Map(metas.map((m) => [m.ddragonId.toLowerCase(), m.id]));
       this.loadedAt = Date.now();
       return this.data;
     } catch {
@@ -103,6 +115,7 @@ export class ChampionCatalog {
       string,
       {
         key: string;
+        id: string;
         name: string;
         image: { full: string };
         tags?: string[];
@@ -116,6 +129,16 @@ export class ChampionCatalog {
   /** Metadatos (incluye tipo de daño) del campeón si el catálogo ya está cargado. */
   getMeta(championId: number): ChampionMeta | null {
     return this.byId.get(championId) ?? null;
+  }
+
+  /** championId numérico a partir del id de Data Dragon (p.ej. "Xerath"). */
+  idFromDdragonId(ddragonId: string): number | null {
+    return this.byDdragonId.get(ddragonId.toLowerCase()) ?? null;
+  }
+
+  /** championId numérico a partir del nombre visible (comparación laxa). */
+  idFromName(name: string): number | null {
+    return this.byName.get(normalizeName(name)) ?? null;
   }
 
   /** Devuelve el catálogo, recargándolo si está vacío o vencido. */

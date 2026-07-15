@@ -276,13 +276,27 @@ async function refreshChampSelect() {
 
 async function refreshInGame() {
   $('contextTitle').textContent = 'En partida';
-  if (!lastPickedChampionId) {
+
+  // Preferimos la Live Client API (autoritativa, funciona aunque no viéramos el
+  // champ select); si no hay partida detectable, caemos al último pick conocido.
+  let championId = null;
+  let role = lastPickedRole;
+  const live = await api('/api/live/champion');
+  if (live.ok && live.data && live.data.active && live.data.championId) {
+    championId = live.data.championId;
+    role = live.data.role && live.data.role !== 'UNKNOWN' ? live.data.role : role;
+  } else if (lastPickedChampionId) {
+    championId = lastPickedChampionId;
+  }
+
+  if (!championId) {
     $('contextBody').innerHTML =
-      '<span class="muted">No detecté tu campeón. Entra desde champ select para ver tu build completa aquí.</span>';
+      '<span class="muted">Detectando tu campeón… (si acabas de abrir la app en partida, dame unos segundos)</span>';
     return;
   }
-  const b = await api(`/api/builds?championId=${lastPickedChampionId}&role=${lastPickedRole}`);
-  const head = `<div class="pickhead" style="margin-bottom:.5rem">${champChip(lastPickedChampionId, 36)}</div>`;
+
+  const b = await api(`/api/builds?championId=${championId}&role=${role || 'UNKNOWN'}`);
+  const head = `<div class="pickhead" style="margin-bottom:.5rem">${champChip(championId, 36)}</div>`;
   if (!b.ok) {
     $('contextBody').innerHTML = `${head}<span class="muted">Sin build para este campeón todavía.</span>`;
     return;

@@ -11,6 +11,8 @@ import { GetRecentMatchesUseCase } from '../application/get-recent-matches.js';
 import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
 import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
 import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
+import { GetLiveChampionUseCase } from '../application/get-live-champion.js';
+import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
 import {
   ArchetypeBuildProvider,
@@ -48,6 +50,8 @@ export interface ServerDeps {
   identityStore?: IdentityStore;
   /** Catálogo de campeones (Data Dragon) para nombre/icono. */
   championCatalog?: ChampionCatalog;
+  /** Lector de la Live Client API para el campeón en partida. */
+  liveGameReader?: LiveGameReader;
 }
 
 const recommendationsQuerySchema = z.object({
@@ -99,6 +103,7 @@ export function createServer(deps: ServerDeps = {}): Express {
   const aramReader = deps.aramReader ?? new AramReader();
   const championTraits = deps.championTraits ?? new SeedChampionTraitProvider();
   const championCatalog = deps.championCatalog ?? new ChampionCatalog();
+  const liveGameReader = deps.liveGameReader ?? new LiveGameReader();
   const getClientStatus = new GetClientStatusUseCase(detector);
   const getChampSelectSession = new GetChampSelectSessionUseCase(champSelectReader);
   const getGameQueue = new GetGameQueueUseCase(gameQueueDetector);
@@ -115,6 +120,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       new CatalogArchetypeBuildProvider(championCatalog),
     ]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
+  const getLiveChampion = new GetLiveChampionUseCase(liveGameReader, championCatalog);
   const riotClient = deps.riotClient ?? null;
   const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
   const getRecentMatches = riotClient ? new GetRecentMatchesUseCase(riotClient) : null;
@@ -184,6 +190,19 @@ export function createServer(deps: ServerDeps = {}): Express {
       res.json(status);
     } catch (err) {
       res.status(500).json({ error: 'client_status_failed', message: String(err) });
+    }
+  });
+
+  app.get('/api/live/champion', async (_req: Request, res: Response) => {
+    try {
+      const result = await getLiveChampion.execute();
+      if (!result) {
+        res.json({ active: false });
+        return;
+      }
+      res.json({ active: true, ...result });
+    } catch (err) {
+      res.status(500).json({ error: 'live_champion_failed', message: String(err) });
     }
   });
 
