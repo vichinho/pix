@@ -20,6 +20,10 @@ import { AramReader } from '../infrastructure/lcu/aram-reader.js';
 import { SeedChampionPool } from '../infrastructure/champions/seed-champion-pool.js';
 import { SeedChampionTraitProvider } from '../infrastructure/champions/champion-traits.js';
 import { RiotApiError, type RiotApiClient } from '../infrastructure/riot/riot-api-client.js';
+import {
+  MemoryIdentityStore,
+  type IdentityStore,
+} from '../infrastructure/persistence/identity-store.js';
 import type { ChampionPool } from '../domain/recommendation.js';
 import type { ChampionTraitProvider } from '../domain/aram.js';
 
@@ -35,6 +39,8 @@ export interface ServerDeps {
   buildProvider?: BuildProvider;
   /** Directorio de la UI web estática. Por defecto, la carpeta `public` del repo. */
   staticDir?: string | null;
+  /** Almacén de la última identidad conectada (por defecto en memoria). */
+  identityStore?: IdentityStore;
 }
 
 const recommendationsQuerySchema = z.object({
@@ -103,25 +109,34 @@ export function createServer(deps: ServerDeps = {}): Express {
     ? new GetPersonalizedRecommendationsUseCase(championPool, getRecentMatches, champSelectReader)
     : null;
 
+  const identityStore = deps.identityStore ?? new MemoryIdentityStore();
+
   /**
-   * Resuelve la identidad Riot: primero de la query, luego del cliente local.
-   * Tolerante a fallos: si la lectura del cliente falla (timeout, cliente
-   * ocupado), devuelve null en vez de propagar el error.
+   * Resuelve la identidad Riot en orden de preferencia:
+   * 1) query explícita, 2) cliente local (y la recuerda), 3) última identidad
+   * conocida (para seguir mostrando el perfil aunque el cliente esté cerrado).
+   * Tolerante a fallos: nunca propaga errores del cliente.
    */
   async function resolveIdentity(
     gameName: string | undefined,
     tagLine: string | undefined,
   ): Promise<PlayerIdentity | null> {
-    if (gameName && tagLine) return { gameName, tagLine };
+    if (gameName && tagLine) {
+      const identity = { gameName, tagLine };
+      identityStore.set(identity);
+      return identity;
+    }
     try {
       const summoner = await detector.getCurrentSummoner();
       if (summoner && summoner.gameName && summoner.tagLine) {
-        return { gameName: summoner.gameName, tagLine: summoner.tagLine };
+        const identity = { gameName: summoner.gameName, tagLine: summoner.tagLine };
+        identityStore.set(identity);
+        return identity;
       }
     } catch {
-      // Cliente no disponible o lento: identidad no resoluble por ahora.
+      // Cliente no disponible o lento: caemos a la última identidad conocida.
     }
-    return null;
+    return identityStore.get();
   }
 
   const app = express();

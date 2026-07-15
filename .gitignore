@@ -3,6 +3,6 @@ dist/
 *.log
 .env
 .env.local
-data/*.sqlite
+data/
 coverage/
 .DS_Store

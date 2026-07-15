@@ -1,6 +1,8 @@
+import { join } from 'node:path';
 import { loadConfig } from './config/config.js';
 import { createServer } from './api/server.js';
 import { RiotApiClient } from './infrastructure/riot/riot-api-client.js';
+import { FileIdentityStore } from './infrastructure/persistence/identity-store.js';
 
 /** Carga variables desde .env si existe (Node 20.12+/22). */
 function loadDotEnv(): void {
@@ -40,7 +42,8 @@ function main(): void {
       })
     : null;
 
-  const app = createServer({ riotClient });
+  const identityStore = new FileIdentityStore(join(process.cwd(), 'data', 'last-identity.json'));
+  const app = createServer({ riotClient, identityStore });
 
   app.listen(config.port, '127.0.0.1', () => {
     // eslint-disable-next-line no-console

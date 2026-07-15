@@ -25,11 +25,13 @@ const ROLE_ES = { TOP: 'Top', JUNGLE: 'Jungla', MIDDLE: 'Mid', BOTTOM: 'ADC', UT
 
 // --- Estado de cliente y Riot ------------------------------------------
 let riotConfigured = false;
+let clientConnected = false;
 
 async function refreshStatus() {
   const { data } = await api('/api/client/status');
   const badge = $('clientBadge');
-  if (data && data.connected) {
+  clientConnected = !!(data && data.connected);
+  if (clientConnected) {
     badge.textContent = `Cliente: ${stateEs(data.clientState)}`;
     badge.className = 'badge badge-on';
   } else {
@@ -70,17 +72,23 @@ async function refreshRiotPanels() {
 
   if (prof.ok && prof.data) {
     const p = prof.data;
+    const cached = clientConnected ? '' : ' <span class="badge badge-muted">última sesión</span>';
     $('profileBody').innerHTML = `<div class="kv">
-      <span class="k">Invocador</span><span>${esc(p.gameName)} #${esc(p.tagLine)}</span>
+      <span class="k">Invocador</span><span>${esc(p.gameName)} #${esc(p.tagLine)}${cached}</span>
       <span class="k">Nivel</span><span>${esc(p.summonerLevel ?? '—')}</span>
       <span class="k">Región</span><span>${esc(p.region)}</span>
     </div>`;
+    refreshStats();
+    refreshMatches();
+  } else if (prof.status === 400) {
+    // Aún no conocemos ninguna identidad (cliente nunca conectado en esta máquina).
+    $('profileBody').innerHTML =
+      '<span class="muted">Abre el cliente de LoL una vez para vincular tu cuenta, o consulta con tu Riot ID.</span>';
+    $('statsBody').innerHTML = '<span class="muted">—</span>';
+    $('matchesBody').innerHTML = '<span class="muted">—</span>';
   } else {
     $('profileBody').innerHTML = `<span class="err">No se pudo cargar el perfil (${esc(prof.data?.error || prof.status)}).</span>`;
   }
-
-  refreshStats();
-  refreshMatches();
 }
 
 async function refreshStats() {
