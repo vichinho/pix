@@ -19,12 +19,15 @@ export function buildGeneric(
     summonerSpells: summonersFor(role, damage),
     runes: runesFor(damage),
     startingItems: startingFor(damage),
-    coreItems: coreFor(damage),
+    coreItems: coreFor(damage, role),
     situationalItems: situationalFor(damage),
     skillOrder: ['Q', 'W', 'E'],
     source: 'archetype',
     patch: 'genérico',
-    notes: 'Build genérica por arquetipo (sin datos curados específicos para este campeón).',
+    notes:
+      role === 'ARAM'
+        ? 'Build genérica para ARAM (sin datos curados específicos para este campeón).'
+        : 'Build genérica por arquetipo (sin datos curados específicos para este campeón).',
   };
 }
 
@@ -74,11 +77,17 @@ export class DefaultBuildProvider implements BuildProvider {
 }
 
 function summonersFor(role: Role, damage: DamageType): string[] {
+  // ARAM: Flash + Mark es el estándar. Los supports encantadores suelen preferir
+  // Cláridad en vez de Mark, pero Mark es la opción más segura y versátil.
+  if (role === 'ARAM') {
+    if (damage === 'NONE') return ['Flash', 'Cláridad'];
+    return ['Flash', 'Mark'];
+  }
   if (role === 'JUNGLE') return ['Flash', 'Castigo'];
   if (role === 'UTILITY') return ['Flash', 'Ignite'];
   if (role === 'BOTTOM') return ['Flash', 'Curación'];
   if (role === 'TOP') return ['Flash', 'Teletransporte'];
-  // Mid/desconocido: encender por defecto para magos/asesinos.
+  // Mid/desconocido
   return damage === 'AP' || damage === 'MIXED' ? ['Flash', 'Ignite'] : ['Flash', 'Ignite'];
 }
 
@@ -120,7 +129,11 @@ function startingFor(damage: DamageType): number[] {
   return [ITEM.DORANS_BLADE, ITEM.HEALTH_POTION];
 }
 
-function coreFor(damage: DamageType): number[] {
+function coreFor(damage: DamageType, role: Role): number[] {
+  // En ARAM los encantadores priorizan items de curación grupal
+  if (role === 'ARAM' && damage === 'NONE') {
+    return [ITEM.MOONSTONE_RENEWER, ITEM.IONIAN_BOOTS, ITEM.STAFF_OF_FLOWING_WATER];
+  }
   if (damage === 'AP') return [ITEM.SORCERERS_SHOES, ITEM.LUDENS_COMPANION];
   if (damage === 'NONE') return [ITEM.PLATED_STEELCAPS, ITEM.SUNFIRE_AEGIS];
   return [ITEM.IONIAN_BOOTS, ITEM.ECLIPSE];
