@@ -72,9 +72,11 @@ npm test
 Luego abre el **dashboard** en el navegador: **http://127.0.0.1:3535/**
 
 La UI (dark theme, sin paso de build) se sirve desde `public/` y consume la API local:
-muestra estado del cliente, perfil, historial y estadísticas, y se adapta al contexto
-(champ select con recomendaciones, o análisis de composición en ARAM), además de una
-consulta de builds. Es la base para migrar luego a React/Electron.
+muestra estado del cliente, perfil, historial y estadísticas. El panel de contexto es
+**dinámico**: en champ select muestra los campeones recomendados para tu línea y las
+runas/hechizos de tu pick (con nombre e icono del campeón); en ARAM, el análisis de
+composición; y ya **en partida**, la build completa del campeón. Es la base para migrar
+luego a React/Electron.
 
 Ejemplos de respuesta con el cliente cerrado:
 

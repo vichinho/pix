@@ -12,7 +12,10 @@ import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
 import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
 import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
-import { ArchetypeBuildProvider } from '../infrastructure/champions/archetype-build-provider.js';
+import {
+  ArchetypeBuildProvider,
+  CatalogArchetypeBuildProvider,
+} from '../infrastructure/champions/archetype-build-provider.js';
 import { ChampionCatalog } from '../infrastructure/champions/champion-catalog.js';
 import { FallbackBuildProvider, type BuildProvider } from '../domain/build.js';
 import { ClientDetector } from '../infrastructure/lcu/client-detector.js';
@@ -106,7 +109,11 @@ export function createServer(deps: ServerDeps = {}): Express {
   const getAramAnalysis = new GetAramAnalysisUseCase(aramReader, championTraits);
   const buildProvider =
     deps.buildProvider ??
-    new FallbackBuildProvider([new SeedBuildProvider(), new ArchetypeBuildProvider(championTraits)]);
+    new FallbackBuildProvider([
+      new SeedBuildProvider(),
+      new ArchetypeBuildProvider(championTraits),
+      new CatalogArchetypeBuildProvider(championCatalog),
+    ]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
   const riotClient = deps.riotClient ?? null;
   const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
@@ -326,12 +333,14 @@ export function createServer(deps: ServerDeps = {}): Express {
     }
   });
 
-  app.get('/api/builds', (req: Request, res: Response) => {
+  app.get('/api/builds', async (req: Request, res: Response) => {
     const parsed = buildsQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
       return;
     }
+    // Asegura el catálogo cargado para poder inferir la build genérica de cualquier campeón.
+    await championCatalog.getData();
     const build = getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
     if (!build) {
       res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });

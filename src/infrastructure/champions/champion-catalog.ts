@@ -6,10 +6,18 @@
  * y la UI cae a mostrar el id. Cachea en memoria con un TTL.
  */
 
+import type { DamageType } from '../../domain/aram.js';
+
 export interface ChampionCatalogEntry {
   id: number;
   name: string;
   image: string; // p.ej. "Xerath.png"
+}
+
+/** Metadatos internos incluyendo tipo de daño inferido de Data Dragon. */
+export interface ChampionMeta extends ChampionCatalogEntry {
+  tags: string[];
+  damage: DamageType;
 }
 
 export interface ChampionCatalogData {
@@ -38,7 +46,7 @@ export class ChampionCatalog {
   private readonly locale: string;
   private readonly ttlMs: number;
   private data: ChampionCatalogData | null = null;
-  private byId = new Map<number, ChampionCatalogEntry>();
+  private byId = new Map<number, ChampionMeta>();
   private loadedAt = 0;
   private inflight: Promise<ChampionCatalogData | null> | null = null;
 
@@ -65,18 +73,20 @@ export class ChampionCatalog {
       );
       if (!champsRaw) return this.data;
 
-      const champions: ChampionCatalogEntry[] = Object.values(champsRaw.data).map((c) => ({
+      const metas: ChampionMeta[] = Object.values(champsRaw.data).map((c) => ({
         id: Number(c.key),
         name: c.name,
         image: c.image.full,
+        tags: c.tags ?? [],
+        damage: inferDamage(c.tags ?? [], c.info),
       }));
 
       this.data = {
         version,
         iconBase: `${DDRAGON}/cdn/${version}/img/champion/`,
-        champions,
+        champions: metas.map((m) => ({ id: m.id, name: m.name, image: m.image })),
       };
-      this.byId = new Map(champions.map((c) => [c.id, c]));
+      this.byId = new Map(metas.map((m) => [m.id, m]));
       this.loadedAt = Date.now();
       return this.data;
     } catch {
@@ -88,8 +98,24 @@ export class ChampionCatalog {
   private fetchChampions(
     version: string,
     locale: string,
-  ): Promise<{ data: Record<string, { key: string; name: string; image: { full: string } }> }> {
+  ): Promise<{
+    data: Record<
+      string,
+      {
+        key: string;
+        name: string;
+        image: { full: string };
+        tags?: string[];
+        info?: { attack: number; magic: number; defense: number };
+      }
+    >;
+  }> {
     return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/champion.json`);
+  }
+
+  /** Metadatos (incluye tipo de daño) del campeón si el catálogo ya está cargado. */
+  getMeta(championId: number): ChampionMeta | null {
+    return this.byId.get(championId) ?? null;
   }
 
   /** Devuelve el catálogo, recargándolo si está vacío o vencido. */
@@ -107,4 +133,26 @@ export class ChampionCatalog {
     await this.getData();
     return this.byId.get(championId)?.name ?? null;
   }
+}
+
+/**
+ * Infiere el tipo de daño predominante desde los tags e info de Data Dragon.
+ * Heurística simple pero suficiente para armar una build genérica.
+ */
+export function inferDamage(
+  tags: string[],
+  info?: { attack: number; magic: number },
+): DamageType {
+  const attack = info?.attack ?? 0;
+  const magic = info?.magic ?? 0;
+  if (tags.includes('Marksman')) return 'AD';
+  if (tags.includes('Mage')) return 'AP';
+  if (tags.includes('Tank')) return 'NONE';
+  if (tags.includes('Support')) return magic >= attack ? 'AP' : 'NONE';
+  if (tags.includes('Assassin') || tags.includes('Fighter')) {
+    return magic > attack ? 'AP' : 'AD';
+  }
+  if (magic > attack) return 'AP';
+  if (attack > magic) return 'AD';
+  return 'MIXED';
 }

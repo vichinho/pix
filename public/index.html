@@ -45,47 +45,10 @@
             <span id="queueBadge" class="badge badge-muted">—</span>
           </div>
           <div id="contextBody" class="muted">
-            Abre el cliente de LoL y entra a una partida para ver aquí tu champ
-            select, recomendaciones o el análisis de ARAM.
+            Abre el cliente de LoL y entra a una partida: en <strong>selección de
+            campeón</strong> verás los campeones recomendados para tu línea y las runas
+            de tu pick; ya <strong>en partida</strong> aparecerá tu build completa.
           </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <h2>Recomendaciones por rol</h2>
-            <div class="controls">
-              <select id="roleSelect">
-                <option value="TOP">Top</option>
-                <option value="JUNGLE">Jungla</option>
-                <option value="MIDDLE" selected>Mid</option>
-                <option value="BOTTOM">ADC</option>
-                <option value="UTILITY">Support</option>
-              </select>
-              <label class="check">
-                <input type="checkbox" id="personalizedChk" /> personalizado
-              </label>
-              <button id="recBtn">Sugerir</button>
-            </div>
-          </div>
-          <div id="recBody" class="muted">Elige un rol y pulsa “Sugerir”.</div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <h2>Build de campeón</h2>
-            <div class="controls">
-              <input id="buildChampId" type="number" min="1" placeholder="championId (ej. 101)" />
-              <select id="buildRole">
-                <option value="MIDDLE" selected>Mid</option>
-                <option value="TOP">Top</option>
-                <option value="JUNGLE">Jungla</option>
-                <option value="BOTTOM">ADC</option>
-                <option value="UTILITY">Support</option>
-              </select>
-              <button id="buildBtn">Ver build</button>
-            </div>
-          </div>
-          <div id="buildBody" class="muted">Ingresa un championId para ver su build.</div>
         </div>
       </section>
     </main>

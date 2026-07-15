@@ -177,36 +177,7 @@ function reasonEs(r) {
   return { meta_pick: 'meta', comfort_pick: 'cómodo', comfort_pick_plus_meta: 'cómodo + meta' }[r] || r || '';
 }
 
-async function loadRecommendations() {
-  const role = $('roleSelect').value;
-  const personalized = $('personalizedChk').checked;
-  $('recBody').innerHTML = '<span class="spinner">Cargando…</span>';
-  let path = `/api/recommendations?role=${role}&limit=5`;
-  if (personalized) path += '&personalized=true';
-  const { ok, data, status } = await api(path);
-  if (!ok) {
-    const msg = status === 503 ? 'Requiere RIOT_API_KEY para personalizar.' : data?.error || status;
-    $('recBody').innerHTML = `<span class="err">${esc(msg)}</span>`;
-    return;
-  }
-  renderRecommendations($('recBody'), data);
-}
-
 // --- Build --------------------------------------------------------------
-async function loadBuild() {
-  const id = $('buildChampId').value;
-  const role = $('buildRole').value;
-  if (!id) return;
-  $('buildBody').innerHTML = '<span class="spinner">Cargando…</span>';
-  const { ok, data, status } = await api(`/api/builds?championId=${id}&role=${role}`);
-  if (!ok) {
-    const msg = status === 404 ? 'Sin build curada para ese campeón todavía.' : data?.error || status;
-    $('buildBody').innerHTML = `<span class="err">${esc(msg)}</span>`;
-    return;
-  }
-  $('buildBody').innerHTML = renderBuild(data);
-}
-
 function renderBuild(b) {
   const list = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join('');
   return `
@@ -366,9 +337,6 @@ async function tick() {
   const status = await refreshStatus();
   await refreshContext(status?.clientState);
 }
-
-$('recBtn').addEventListener('click', loadRecommendations);
-$('buildBtn').addEventListener('click', loadBuild);
 
 // Arranque
 loadCatalog();

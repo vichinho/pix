@@ -1,12 +1,34 @@
 import type { BuildProvider } from '../../domain/build.js';
 import type { ChampionTraitProvider, DamageType } from '../../domain/aram.js';
 import type { ChampionBuild, Role, RuneSelection } from '../../domain/types.js';
+import type { ChampionCatalog } from './champion-catalog.js';
+
+/** Arma una build genérica sensata a partir del tipo de daño y el rol. */
+export function buildGeneric(
+  championId: number,
+  championName: string,
+  role: Role,
+  damage: DamageType,
+): ChampionBuild {
+  return {
+    championId,
+    championName,
+    role,
+    summonerSpells: summonersFor(role, damage),
+    runes: runesFor(damage),
+    startingItems: startingFor(damage),
+    coreItems: coreFor(damage),
+    situationalItems: situationalFor(damage),
+    skillOrder: ['Q', 'W', 'E'],
+    source: 'archetype',
+    patch: 'genérico',
+    notes: 'Build genérica por arquetipo (sin datos curados específicos para este campeón).',
+  };
+}
 
 /**
- * Proveedor de builds genéricas por arquetipo: cuando no hay una build curada,
- * arma una sugerencia razonable a partir del tipo de daño del campeón (de los
- * metadatos de ARAM) y del rol. Da runas y hechizos sensatos para CUALQUIER
- * campeón que tenga metadatos, marcados como genéricos.
+ * Proveedor de builds genéricas usando los metadatos de ARAM (tipo de daño).
+ * Cubre los campeones presentes en ese dataset curado.
  */
 export class ArchetypeBuildProvider implements BuildProvider {
   readonly name = 'archetype';
@@ -16,21 +38,24 @@ export class ArchetypeBuildProvider implements BuildProvider {
   getBuild(championId: number, role: Role): ChampionBuild | null {
     const t = this.traits.get(championId);
     if (!t) return null;
+    return buildGeneric(championId, t.name, role, t.damage);
+  }
+}
 
-    return {
-      championId,
-      championName: t.name,
-      role,
-      summonerSpells: summonersFor(role, t.damage),
-      runes: runesFor(t.damage),
-      startingItems: startingFor(t.damage),
-      coreItems: coreFor(t.damage),
-      situationalItems: situationalFor(t.damage),
-      skillOrder: ['Q', 'W', 'E'],
-      source: 'archetype',
-      patch: 'genérico',
-      notes: 'Build genérica por arquetipo (sin datos curados específicos para este campeón).',
-    };
+/**
+ * Proveedor de builds genéricas usando el catálogo de Data Dragon: cubre a
+ * CUALQUIER campeón (una vez cargado el catálogo), infiriendo el tipo de daño
+ * de sus tags/info. Es el último recurso para que nunca falte una sugerencia.
+ */
+export class CatalogArchetypeBuildProvider implements BuildProvider {
+  readonly name = 'catalog-archetype';
+
+  constructor(private readonly catalog: ChampionCatalog) {}
+
+  getBuild(championId: number, role: Role): ChampionBuild | null {
+    const meta = this.catalog.getMeta(championId);
+    if (!meta) return null;
+    return buildGeneric(championId, meta.name, role, meta.damage);
   }
 }
 

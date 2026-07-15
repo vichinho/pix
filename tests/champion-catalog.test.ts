@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   ChampionCatalog,
+  inferDamage,
   type CatalogFetch,
 } from '@/infrastructure/champions/champion-catalog.js';
-import { ArchetypeBuildProvider } from '@/infrastructure/champions/archetype-build-provider.js';
+import {
+  ArchetypeBuildProvider,
+  CatalogArchetypeBuildProvider,
+} from '@/infrastructure/champions/archetype-build-provider.js';
 import { SeedChampionTraitProvider } from '@/infrastructure/champions/champion-traits.js';
 
 function fetchOk(bodyByUrl: (url: string) => unknown): CatalogFetch {
@@ -16,8 +20,14 @@ function fetchOk(bodyByUrl: (url: string) => unknown): CatalogFetch {
 
 const championJson = {
   data: {
-    Xerath: { key: '101', id: 'Xerath', name: 'Xerath', image: { full: 'Xerath.png' } },
-    Ahri: { key: '103', id: 'Ahri', name: 'Ahri', image: { full: 'Ahri.png' } },
+    Xerath: {
+      key: '101', id: 'Xerath', name: 'Xerath', image: { full: 'Xerath.png' },
+      tags: ['Mage'], info: { attack: 1, magic: 10, defense: 3 },
+    },
+    Ashe: {
+      key: '22', id: 'Ashe', name: 'Ashe', image: { full: 'Ashe.png' },
+      tags: ['Marksman'], info: { attack: 7, magic: 2, defense: 3 },
+    },
   },
 };
 
@@ -31,6 +41,9 @@ describe('ChampionCatalog', () => {
     expect(data?.iconBase).toContain('/cdn/14.24.1/img/champion/');
     expect(data?.champions).toHaveLength(2);
     expect(await catalog.name(101)).toBe('Xerath');
+    // El payload público no expone tags/damage, pero getMeta sí (uso interno).
+    expect(catalog.getMeta(101)?.damage).toBe('AP');
+    expect(catalog.getMeta(22)?.damage).toBe('AD');
   });
 
   it('devuelve null (degradación) si el CDN falla', async () => {
@@ -77,5 +90,36 @@ describe('ArchetypeBuildProvider', () => {
 
   it('devuelve null si no hay metadatos del campeón', () => {
     expect(provider.getBuild(999999, 'MIDDLE')).toBeNull();
+  });
+});
+
+describe('inferDamage', () => {
+  it('clasifica por tags principales', () => {
+    expect(inferDamage(['Marksman'])).toBe('AD');
+    expect(inferDamage(['Mage'])).toBe('AP');
+    expect(inferDamage(['Tank'])).toBe('NONE');
+  });
+  it('desempata fighters/assassins por attack vs magic', () => {
+    expect(inferDamage(['Fighter'], { attack: 8, magic: 2 })).toBe('AD');
+    expect(inferDamage(['Assassin'], { attack: 2, magic: 8 })).toBe('AP');
+  });
+});
+
+describe('CatalogArchetypeBuildProvider', () => {
+  it('genera build genérica para cualquier campeón del catálogo', async () => {
+    const catalog = new ChampionCatalog({
+      fetchImpl: fetchOk((url) => (url.includes('versions') ? ['1.0.0'] : championJson)),
+    });
+    await catalog.getData(); // carga metadatos en memoria
+    const provider = new CatalogArchetypeBuildProvider(catalog);
+    const build = provider.getBuild(22, 'BOTTOM'); // Ashe = AD (Marksman)
+    expect(build?.championName).toBe('Ashe');
+    expect(build?.runes.primaryStyle).toBe('Precisión');
+    expect(build?.summonerSpells).toContain('Curación');
+  });
+
+  it('devuelve null si el catálogo no está cargado', () => {
+    const provider = new CatalogArchetypeBuildProvider(new ChampionCatalog());
+    expect(provider.getBuild(22, 'BOTTOM')).toBeNull();
   });
 });
