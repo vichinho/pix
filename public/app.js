@@ -23,6 +23,28 @@ const esc = (s) =>
 
 const ROLE_ES = { TOP: 'Top', JUNGLE: 'Jungla', MIDDLE: 'Mid', BOTTOM: 'ADC', UTILITY: 'Support', UNKNOWN: '—' };
 
+// --- Catálogo de campeones (nombre + icono desde Data Dragon) -----------
+let catalogById = new Map();
+let iconBase = '';
+let lastPickedChampionId = null;
+let lastPickedRole = 'UNKNOWN';
+
+async function loadCatalog() {
+  const { ok, data } = await api('/api/champions');
+  if (ok && data && Array.isArray(data.champions)) {
+    iconBase = data.iconBase || '';
+    catalogById = new Map(data.champions.map((c) => [Number(c.id), c]));
+  }
+}
+
+function champChip(id, size = 22) {
+  const e = catalogById.get(Number(id));
+  if (e && iconBase) {
+    return `<span class="chip"><img class="cicon" style="width:${size}px;height:${size}px" src="${iconBase}${esc(e.image)}" alt="${esc(e.name)}" loading="lazy"/> ${esc(e.name)}</span>`;
+  }
+  return `<span class="chip">${e ? esc(e.name) : '#' + esc(id)}</span>`;
+}
+
 // --- Estado de cliente y Riot ------------------------------------------
 let riotConfigured = false;
 let clientConnected = false;
@@ -188,7 +210,7 @@ async function loadBuild() {
 function renderBuild(b) {
   const list = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join('');
   return `
-    <div class="kv"><span class="k">Campeón</span><span>${esc(b.championName)} · ${esc(ROLE_ES[b.role] || b.role)}</span>
+    <div class="kv"><span class="k">Campeón</span><span>${champChip(b.championId, 22)} · ${esc(ROLE_ES[b.role] || b.role)}</span>
       <span class="k">Hechizos</span><span>${esc((b.summonerSpells || []).join(' + '))}</span>
       <span class="k">Skill order</span><span>${esc((b.skillOrder || []).join(' > '))}</span></div>
     <div class="build-block"><div class="label">Runas</div>
@@ -214,6 +236,9 @@ async function refreshContext(clientState) {
 
   const isAram = queue.ok && queue.data?.queue?.category === 'ARAM';
 
+  if (clientState === 'IN_GAME') {
+    return refreshInGame();
+  }
   if (isAram) {
     return refreshAram();
   }
@@ -225,6 +250,16 @@ async function refreshContext(clientState) {
     '<span class="muted">Sin champ select activo. Entra a una partida para ver recomendaciones o análisis de ARAM.</span>';
 }
 
+function renderRunesSummoners(b) {
+  const list = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join(' ');
+  return `<div class="kv">
+      <span class="k">Hechizos</span><span>${esc((b.summonerSpells || []).join(' + '))}</span>
+      <span class="k">Keystone</span><span>${esc(b.runes.keystone)} <span class="muted">(${esc(b.runes.primaryStyle)})</span></span>
+    </div>
+    <div style="margin-top:.3rem">${list(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}:</span> ${list(b.runes.secondary)} · ${list(b.runes.shards)}</div>
+    <div class="muted" style="margin-top:.35rem">Skill: ${esc((b.skillOrder || []).join(' > '))} · fuente: ${esc(b.source)}</div>`;
+}
+
 async function refreshChampSelect() {
   $('contextTitle').textContent = 'Champion Select';
   const { data } = await api('/api/champ-select/session');
@@ -233,6 +268,12 @@ async function refreshChampSelect() {
     return;
   }
   const s = data.session;
+  if (s.selectedChampionId) {
+    lastPickedChampionId = s.selectedChampionId;
+    lastPickedRole = s.assignedRole;
+  }
+
+  // Sugerencias por rol.
   const rec = await api(`/api/recommendations?role=${s.assignedRole}&limit=5${riotConfigured ? '&personalized=true' : ''}`);
   let recHtml = '<span class="muted">—</span>';
   if (rec.ok) {
@@ -240,14 +281,42 @@ async function refreshChampSelect() {
     renderRecommendations(tmp, rec.data);
     recHtml = tmp.innerHTML;
   }
+
+  // Runas + summoners del campeón que estás eligiendo.
+  let pickHtml = '';
+  if (s.selectedChampionId) {
+    const head = `${champChip(s.selectedChampionId, 30)} ${s.pickCompleted ? '<span class="pill">confirmado</span>' : '<span class="pill">eligiendo</span>'}`;
+    const b = await api(`/api/builds?championId=${s.selectedChampionId}&role=${s.assignedRole}`);
+    const body = b.ok
+      ? renderRunesSummoners(b.data)
+      : '<span class="muted">Sin runas sugeridas para este campeón todavía.</span>';
+    pickHtml = `<div class="build-block"><div class="label">Tu campeón · runas y hechizos</div><div class="pickhead">${head}</div>${body}</div>`;
+  }
+
   $('contextBody').innerHTML = `
     <div class="kv">
       <span class="k">Rol</span><span>${esc(ROLE_ES[s.assignedRole] || s.assignedRole)}</span>
       <span class="k">Fase</span><span>${esc(s.phase)}</span>
-      <span class="k">Tu campeón</span><span>${s.selectedChampionId ? '#' + s.selectedChampionId + (s.pickCompleted ? ' (confirmado)' : ' (eligiendo)') : '—'}</span>
-      <span class="k">Bans</span><span>${(s.bans || []).map((b) => `<span class="tag bad">#${b}</span>`).join('') || '—'}</span>
+      <span class="k">Bans</span><span>${(s.bans || []).map((b) => champChip(b, 18)).join(' ') || '—'}</span>
     </div>
+    ${pickHtml}
     <div class="build-block"><div class="label">Sugerencias para tu rol</div>${recHtml}</div>`;
+}
+
+async function refreshInGame() {
+  $('contextTitle').textContent = 'En partida';
+  if (!lastPickedChampionId) {
+    $('contextBody').innerHTML =
+      '<span class="muted">No detecté tu campeón. Entra desde champ select para ver tu build completa aquí.</span>';
+    return;
+  }
+  const b = await api(`/api/builds?championId=${lastPickedChampionId}&role=${lastPickedRole}`);
+  const head = `<div class="pickhead" style="margin-bottom:.5rem">${champChip(lastPickedChampionId, 36)}</div>`;
+  if (!b.ok) {
+    $('contextBody').innerHTML = `${head}<span class="muted">Sin build para este campeón todavía.</span>`;
+    return;
+  }
+  $('contextBody').innerHTML = head + renderBuild(b.data);
 }
 
 async function refreshAram() {
@@ -302,8 +371,12 @@ $('recBtn').addEventListener('click', loadRecommendations);
 $('buildBtn').addEventListener('click', loadBuild);
 
 // Arranque
+loadCatalog();
 refreshRiotPanels();
 tick();
 setInterval(tick, 4000);
-// Reintenta los paneles Riot con menor frecuencia (por si activan la key luego).
-setInterval(refreshRiotPanels, 30000);
+// Reintenta paneles Riot y el catálogo con menor frecuencia (por si fallaron).
+setInterval(() => {
+  refreshRiotPanels();
+  if (catalogById.size === 0) loadCatalog();
+}, 30000);

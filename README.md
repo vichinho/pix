@@ -29,6 +29,8 @@ es la **detección del cliente** (LCU), con contratos tipados, API local y tests
 | Perfil e historial de partidas (Riot API) | ✅ Implementado |
 | Build del campeón (runas/items/hechizos/skill order) | ✅ Seed curada |
 | Interfaz web (dashboard) servida por el backend | ✅ Implementado |
+| Catálogo de campeones (nombre/icono, Data Dragon) | ✅ Implementado |
+| Runas + hechizos del campeón en champ select · build in-game | ✅ Implementado |
 | Builds | 🚧 Stub (501) |
 | Settings | 🚧 Stub (501) |
 

@@ -12,7 +12,9 @@ import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
 import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
 import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
-import type { BuildProvider } from '../domain/build.js';
+import { ArchetypeBuildProvider } from '../infrastructure/champions/archetype-build-provider.js';
+import { ChampionCatalog } from '../infrastructure/champions/champion-catalog.js';
+import { FallbackBuildProvider, type BuildProvider } from '../domain/build.js';
 import { ClientDetector } from '../infrastructure/lcu/client-detector.js';
 import { ChampSelectReader } from '../infrastructure/lcu/champ-select.js';
 import { GameQueueDetector } from '../infrastructure/lcu/game-queue.js';
@@ -41,6 +43,8 @@ export interface ServerDeps {
   staticDir?: string | null;
   /** Almacén de la última identidad conectada (por defecto en memoria). */
   identityStore?: IdentityStore;
+  /** Catálogo de campeones (Data Dragon) para nombre/icono. */
+  championCatalog?: ChampionCatalog;
 }
 
 const recommendationsQuerySchema = z.object({
@@ -91,6 +95,7 @@ export function createServer(deps: ServerDeps = {}): Express {
   const championPool = deps.championPool ?? new SeedChampionPool();
   const aramReader = deps.aramReader ?? new AramReader();
   const championTraits = deps.championTraits ?? new SeedChampionTraitProvider();
+  const championCatalog = deps.championCatalog ?? new ChampionCatalog();
   const getClientStatus = new GetClientStatusUseCase(detector);
   const getChampSelectSession = new GetChampSelectSessionUseCase(champSelectReader);
   const getGameQueue = new GetGameQueueUseCase(gameQueueDetector);
@@ -99,7 +104,9 @@ export function createServer(deps: ServerDeps = {}): Express {
     champSelectReader,
   );
   const getAramAnalysis = new GetAramAnalysisUseCase(aramReader, championTraits);
-  const buildProvider = deps.buildProvider ?? new SeedBuildProvider();
+  const buildProvider =
+    deps.buildProvider ??
+    new FallbackBuildProvider([new SeedBuildProvider(), new ArchetypeBuildProvider(championTraits)]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
   const riotClient = deps.riotClient ?? null;
   const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
@@ -153,6 +160,15 @@ export function createServer(deps: ServerDeps = {}): Express {
 
   app.get('/api/health', (_req: Request, res: Response) => {
     res.json({ ok: true });
+  });
+
+  app.get('/api/champions', async (_req: Request, res: Response) => {
+    const data = await championCatalog.getData();
+    if (!data) {
+      res.status(503).json({ error: 'catalog_unavailable' });
+      return;
+    }
+    res.json(data);
   });
 
   app.get('/api/client/status', async (_req: Request, res: Response) => {

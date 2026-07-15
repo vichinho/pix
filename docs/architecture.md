@@ -24,6 +24,7 @@ fallos) sin un cliente de LoL real, usando un conector falso.
 | Método | Ruta | Estado |
 |---|---|---|
 | GET | `/api/health` | ✅ |
+| GET | `/api/champions` | ✅ |
 | GET | `/api/client/status` | ✅ |
 | GET | `/api/player/profile` | ✅ |
 | GET | `/api/player/matches` | ✅ |

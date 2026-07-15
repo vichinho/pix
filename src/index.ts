@@ -3,6 +3,7 @@ import { loadConfig } from './config/config.js';
 import { createServer } from './api/server.js';
 import { RiotApiClient } from './infrastructure/riot/riot-api-client.js';
 import { FileIdentityStore } from './infrastructure/persistence/identity-store.js';
+import { ChampionCatalog } from './infrastructure/champions/champion-catalog.js';
 
 /** Carga variables desde .env si existe (Node 20.12+/22). */
 function loadDotEnv(): void {
@@ -43,7 +44,8 @@ function main(): void {
     : null;
 
   const identityStore = new FileIdentityStore(join(process.cwd(), 'data', 'last-identity.json'));
-  const app = createServer({ riotClient, identityStore });
+  const championCatalog = new ChampionCatalog({ locale: config.ddragonLocale });
+  const app = createServer({ riotClient, identityStore, championCatalog });
 
   app.listen(config.port, '127.0.0.1', () => {
     // eslint-disable-next-line no-console

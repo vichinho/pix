@@ -115,6 +115,10 @@ th { color: var(--muted); font-weight: 600; }
 
 .legal { color: var(--muted); font-size: 0.75rem; text-align: center; padding: 1.25rem; border-top: 1px solid var(--border); margin-top: 1rem; }
 
+.chip { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0.1rem 0.2rem 0.1rem 0; }
+.cicon { border-radius: 6px; border: 1px solid var(--border); object-fit: cover; vertical-align: middle; background: var(--panel-2); }
+.pickhead { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.4rem; }
+
 .build-block { margin-top: 0.6rem; }
 .build-block .label { color: var(--accent-2); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; }
 .spinner { color: var(--muted); font-size: 0.85rem; }
