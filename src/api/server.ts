@@ -103,15 +103,23 @@ export function createServer(deps: ServerDeps = {}): Express {
     ? new GetPersonalizedRecommendationsUseCase(championPool, getRecentMatches, champSelectReader)
     : null;
 
-  /** Resuelve la identidad Riot: primero de la query, luego del cliente local. */
+  /**
+   * Resuelve la identidad Riot: primero de la query, luego del cliente local.
+   * Tolerante a fallos: si la lectura del cliente falla (timeout, cliente
+   * ocupado), devuelve null en vez de propagar el error.
+   */
   async function resolveIdentity(
     gameName: string | undefined,
     tagLine: string | undefined,
   ): Promise<PlayerIdentity | null> {
     if (gameName && tagLine) return { gameName, tagLine };
-    const summoner = await detector.getCurrentSummoner();
-    if (summoner && summoner.gameName && summoner.tagLine) {
-      return { gameName: summoner.gameName, tagLine: summoner.tagLine };
+    try {
+      const summoner = await detector.getCurrentSummoner();
+      if (summoner && summoner.gameName && summoner.tagLine) {
+        return { gameName: summoner.gameName, tagLine: summoner.tagLine };
+      }
+    } catch {
+      // Cliente no disponible o lento: identidad no resoluble por ahora.
     }
     return null;
   }

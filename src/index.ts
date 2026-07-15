@@ -11,8 +11,25 @@ function loadDotEnv(): void {
   }
 }
 
+/**
+ * Red de seguridad: un app local de larga duración no debe caerse por un fallo
+ * transitorio (p.ej. timeout del LCU cuando el cliente está iniciando). Se
+ * registra el error y el proceso sigue vivo.
+ */
+function installProcessGuards(): void {
+  process.on('unhandledRejection', (reason) => {
+    // eslint-disable-next-line no-console
+    console.error('[unhandledRejection]', reason instanceof Error ? reason.message : reason);
+  });
+  process.on('uncaughtException', (err) => {
+    // eslint-disable-next-line no-console
+    console.error('[uncaughtException]', err.message);
+  });
+}
+
 function main(): void {
   loadDotEnv();
+  installProcessGuards();
   const config = loadConfig();
 
   const riotClient = config.riotApiKey
