@@ -66,7 +66,7 @@ const recommendationsQuerySchema = z.object({
 
 const buildsQuerySchema = z.object({
   championId: z.coerce.number().int().positive(),
-  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']).optional(),
+  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'ARAM']).optional(),
 });
 
 const identityQuerySchema = z.object({
@@ -306,6 +306,77 @@ export function createServer(deps: ServerDeps = {}): Express {
     }
   });
 
+  /**
+   * GET /api/aram/build
+   *
+   * Detecta el campeón que el jugador está jugando en este momento via la
+   * Live Client API y devuelve su build recomendada para ARAM con iconos
+   * enriquecidos desde Data Dragon.
+   *
+   * Respuestas:
+   *   200 { active: false }                        — no hay partida activa
+   *   200 { active: true, championId, championName, buildSource, build }  — build encontrada
+   *   500                                          — error interno
+   */
+  app.get(
+    '/api/aram/build',
+    wrap(async (_req: Request, res: Response) => {
+      // 1. Detectar campeón en partida via Live Client API
+      const live = await getLiveChampion.execute();
+      if (!live) {
+        res.json({ active: false });
+        return;
+      }
+
+      // championId puede ser null si el catálogo no pudo resolver el nombre
+      if (live.championId === null) {
+        res.json({
+          active: true,
+          championId: null,
+          championName: live.championName,
+          build: null,
+          error: 'champion_id_unresolved',
+        });
+        return;
+      }
+
+      // 2. Asegurar catálogo cargado (best-effort: si falla, el enriquecimiento
+      //    devolverá iconos null pero no rompe la respuesta)
+      await championCatalog.getData().catch(() => null);
+
+      // 3. Obtener build pasando rol ARAM para activar la lógica específica
+      //    (summoners Flash+Mark, ítems de ARAM, etc.)
+      const build = getChampionBuild.execute(live.championId, 'ARAM');
+
+      // getChampionBuild nunca debería retornar null (DefaultBuildProvider como
+      // último recurso), pero lo manejamos por si acaso.
+      if (!build) {
+        res.status(404).json({
+          error: 'build_not_found',
+          championId: live.championId,
+          championName: live.championName,
+        });
+        return;
+      }
+
+      // 4. Enriquecer con iconos (best-effort: si falla devuelve build sin iconos)
+      let enriched;
+      try {
+        enriched = await enrichBuild(build, championCatalog);
+      } catch {
+        enriched = bareEnrichedBuild(build);
+      }
+
+      res.json({
+        active: true,
+        championId: live.championId,
+        championName: live.championName,
+        buildSource: build.source,
+        build: enriched,
+      });
+    }),
+  );
+
   app.get('/api/player/profile', async (req: Request, res: Response) => {
     if (!getPlayerProfile) {
       res.status(503).json({ error: 'riot_not_configured' });
@@ -383,14 +454,11 @@ export function createServer(deps: ServerDeps = {}): Express {
       }
       // Asegura el catálogo (best-effort) para inferir la build de cualquier campeón.
       await championCatalog.getData().catch(() => null);
-      // getChampionBuild siempre devuelve una build (DefaultBuildProvider como último recurso).
       const build = getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
       if (!build) {
         res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });
         return;
       }
-      // El enriquecimiento (iconos) no debe tumbar la respuesta: si falla, se
-      // devuelve la build sin iconos resueltos.
       try {
         res.json(await enrichBuild(build, championCatalog));
       } catch {
