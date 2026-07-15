@@ -48,12 +48,18 @@
           <div id="statsBody" class="muted text-sm">—</div>
         </section>
 
-        <!-- Últimas partidas -->
-        <section class="card">
+        <!-- Historial de partidas -->
+        <section class="card match-history-card">
           <div class="card-header">
-            <span class="card-title">Últimas partidas</span>
+            <span class="card-title">Historial de partidas</span>
+            <span id="matchPageInfo" class="match-page-info"></span>
           </div>
           <div id="matchesBody" class="muted text-sm">—</div>
+          <div id="matchPagination" class="match-pagination" hidden>
+            <button id="matchPrevBtn" class="pag-btn" disabled aria-label="Página anterior">‹</button>
+            <span id="matchPageLabel" class="pag-label">1 / 1</span>
+            <button id="matchNextBtn" class="pag-btn" disabled aria-label="Página siguiente">›</button>
+          </div>
         </section>
 
       </aside>

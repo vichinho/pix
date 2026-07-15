@@ -675,6 +675,141 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 }
 
 /* ══════════════════════════════════════
+   MATCH HISTORY CARD
+══════════════════════════════════════ */
+
+/* Cada fila del historial */
+.match-row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.5rem;
+  border-radius: var(--radius-xs);
+  transition: background var(--transition);
+  border-left: 3px solid transparent;
+}
+.match-row:hover { background: rgba(255,255,255,0.025); }
+.match-row.win-row  { border-left-color: var(--win); }
+.match-row.loss-row { border-left-color: var(--loss); }
+
+/* Separador entre filas */
+.match-row + .match-row {
+  border-top: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Ícono del campeón (columna 1) */
+.match-champ-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  background: var(--panel-2);
+  flex-shrink: 0;
+}
+
+/* Centro (columna 2): nombre + meta */
+.match-center { min-width: 0; }
+.match-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+.match-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  flex-wrap: wrap;
+}
+.match-role {
+  font-size: 0.68rem;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.match-kda {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.match-kda .kda-good { color: var(--win); }
+.match-time {
+  font-size: 0.66rem;
+  color: var(--faint);
+}
+
+/* Resultado (columna 3) */
+.match-result {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.18rem 0.5rem;
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.match-result.win  { color: var(--win);  background: var(--win-soft);  border: 1px solid rgba(70,201,142,0.2); }
+.match-result.loss { color: var(--loss); background: var(--loss-soft); border: 1px solid rgba(224,92,107,0.2); }
+
+/* Contador total (en el card-header) */
+.match-page-info {
+  font-size: 0.68rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Paginación ── */
+.match-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.pag-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-xs);
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  user-select: none;
+}
+.pag-btn:not(:disabled):hover {
+  background: var(--panel-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+.pag-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.pag-label {
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  min-width: 36px;
+  text-align: center;
+}
+
+/* ══════════════════════════════════════
    FOOTER
 ══════════════════════════════════════ */
 .legal {

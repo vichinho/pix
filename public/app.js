@@ -41,6 +41,18 @@ function champChip(id, size = 22) {
   return `<span class="chip">${e ? esc(e.name) : '#' + esc(id)}</span>`;
 }
 
+/** URL del icono de campeón (sin texto), o null si no está en el catálogo. */
+function champIconUrl(id) {
+  const e = catalogById.get(Number(id));
+  return (e && iconBase) ? `${iconBase}${e.image}` : null;
+}
+
+/** Nombre del campeón desde el catálogo. */
+function champName(id) {
+  const e = catalogById.get(Number(id));
+  return e ? e.name : `#${id}`;
+}
+
 function iconOrText(entry, cls) {
   if (entry.icon) return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" title="${esc(entry.name)}" loading="lazy"/>`;
   return `<span class="tagfallback">${esc(entry.name)}</span>`;
@@ -81,25 +93,14 @@ function renderRunes(runes) {
 
 // --- Ranked helpers -----------------------------------------------------
 
-/**
- * URL del emblema de liga desde Data Dragon.
- * tier: 'IRON'|'BRONZE'|'SILVER'|'GOLD'|'PLATINUM'|'EMERALD'|'DIAMOND'|'MASTER'|'GRANDMASTER'|'CHALLENGER'
- */
 function rankEmblemUrl(tier) {
   if (!tier) return null;
   const t = tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
   return `https://ddragon.leagueoflegends.com/cdn/img/ranked-emblems/Emblem_${t}.png`;
 }
 
-/**
- * Renderiza el bloque completo del perfil con emblema, tier, LP, WR clasificatorio
- * y pico histórico.
- */
 function renderProfile(p) {
-  // Identidad básica
   const cached = clientConnected ? '' : ' <span class="pill ghost" style="font-size:0.65rem">última sesión</span>';
-
-  // Liga actual (soloQ preferido, luego flex)
   const rank = p.soloQueue || p.flexQueue || null;
   const emblemUrl = rank ? rankEmblemUrl(rank.tier) : rankEmblemUrl('Unranked');
   const emblemImg = emblemUrl
@@ -128,7 +129,6 @@ function renderProfile(p) {
     rankBlock = `<div class="rank-unranked">Sin clasificar esta temporada</div>`;
   }
 
-  // Pico histórico
   let peakBlock = '';
   if (p.peakRank && p.peakRank.tier) {
     const pk = p.peakRank;
@@ -213,8 +213,9 @@ async function refreshRiotPanels() {
       <div style="padding:1.4rem 1.3rem">
         <span class="muted">Abre el cliente de LoL una vez para vincular tu cuenta.</span>
       </div>`;
-    $('statsBody').innerHTML   = '<span class="muted">—</span>';
-    $('matchesBody').innerHTML = '<span class="muted">—</span>';
+    $('statsBody').innerHTML = '<span class="muted">—</span>';
+    matchState.all = [];
+    renderMatchPage();
   } else {
     $('profileBody').innerHTML = `<div style="padding:1.4rem 1.3rem"><span class="err">No se pudo cargar el perfil (${esc(prof.data?.error || prof.status)}).</span></div>`;
   }
@@ -236,17 +237,140 @@ async function refreshStats() {
     <table><thead><tr><th>Campeón</th><th>P</th><th>WR</th><th>KDA</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-async function refreshMatches() {
-  const { ok, data, status } = await api('/api/player/matches?count=8');
-  if (!ok) { $('matchesBody').innerHTML = `<span class="err">${esc(data?.error || status)}</span>`; return; }
-  const rows = (data.matches || []).map((m) => `<tr>
-    <td>${champChip(m.championId, 18)}</td>
-    <td class="faint">${esc(ROLE_ES[m.role] || m.role)}</td>
-    <td>${m.kills}/${m.deaths}/${m.assists}</td>
-    <td class="${m.win ? 'win' : 'loss'}">${m.win ? 'V' : 'D'}</td>
-  </tr>`).join('');
-  $('matchesBody').innerHTML = `<table><thead><tr><th>Campeón</th><th>Rol</th><th>KDA</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+// ── Historial de partidas con paginación ────────────────────────────────
+
+const MATCHES_PER_PAGE = 10;
+
+/** Estado de paginación del historial. */
+const matchState = {
+  all: [],   // array completo de partidas
+  page: 0,   // página actual (0-based)
+};
+
+/**
+ * Formatea la duración en segundos como "mm:ss".
+ */
+function fmtDuration(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
+
+/**
+ * Formatea la fecha relativa (hace X días/horas).
+ */
+function fmtRelative(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60)   return `hace ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)    return `hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `hace ${days}d`;
+}
+
+/**
+ * Calcula el ratio KDA como string, marcando en verde si ≥ 3.0.
+ */
+function kdaStr(k, d, a) {
+  if (d === 0) return `<span class="kda-good">${k}/${d}/${a}</span>`;
+  const ratio = ((k + a) / d).toFixed(2);
+  const cls = parseFloat(ratio) >= 3.0 ? 'kda-good' : '';
+  return `<span class="${cls}">${k}/${d}/${a}</span>`;
+}
+
+/**
+ * Renderiza la página actual del historial en #matchesBody.
+ */
+function renderMatchPage() {
+  const body  = $('matchesBody');
+  const pag   = $('matchPagination');
+  const label = $('matchPageLabel');
+  const info  = $('matchPageInfo');
+  const prev  = $('matchPrevBtn');
+  const next  = $('matchNextBtn');
+
+  const all   = matchState.all;
+  const total = all.length;
+
+  if (total === 0) {
+    body.innerHTML = '<span class="muted">No hay partidas recientes.</span>';
+    pag.hidden = true;
+    info.textContent = '';
+    return;
+  }
+
+  const totalPages = Math.ceil(total / MATCHES_PER_PAGE);
+  const page       = Math.max(0, Math.min(matchState.page, totalPages - 1));
+  matchState.page  = page;
+
+  const start = page * MATCHES_PER_PAGE;
+  const slice = all.slice(start, start + MATCHES_PER_PAGE);
+
+  body.innerHTML = slice.map((m) => {
+    const iconUrl = champIconUrl(m.championId);
+    const iconEl  = iconUrl
+      ? `<img class="match-champ-icon" src="${esc(iconUrl)}" alt="${esc(champName(m.championId))}" loading="lazy"/>`
+      : `<div class="match-champ-icon" style="display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--faint)">${esc(m.championId)}</div>`;
+
+    const role    = ROLE_ES[m.role] || m.role;
+    const kda     = kdaStr(m.kills, m.deaths, m.assists);
+    const dur     = fmtDuration(m.durationSec || 0);
+    const rel     = m.playedAt ? fmtRelative(m.playedAt) : '';
+    const winCls  = m.win ? 'win' : 'loss';
+    const rowCls  = m.win ? 'win-row' : 'loss-row';
+    const result  = m.win ? 'V' : 'D';
+
+    return `<div class="match-row ${rowCls}">
+      ${iconEl}
+      <div class="match-center">
+        <div class="match-name">${esc(m.championName || champName(m.championId))}</div>
+        <div class="match-meta">
+          <span class="match-role">${esc(role)}</span>
+          <span class="match-kda">${kda}</span>
+          <span class="match-time">${esc(dur)}${rel ? ' · ' + esc(rel) : ''}</span>
+        </div>
+      </div>
+      <span class="match-result ${winCls}">${result}</span>
+    </div>`;
+  }).join('');
+
+  // Paginación
+  info.textContent = `${total} partidas`;
+  label.textContent = `${page + 1} / ${totalPages}`;
+  prev.disabled = page === 0;
+  next.disabled = page >= totalPages - 1;
+  pag.hidden = totalPages <= 1;
+}
+
+/**
+ * Carga TODAS las partidas recientes (hasta 50) en memoria y muestra la página 1.
+ * Se llama una sola vez al cargar el perfil; después solo se repagina en cliente.
+ */
+async function refreshMatches() {
+  const body = $('matchesBody');
+  body.innerHTML = '<span class="muted">Cargando partidas…</span>';
+  $('matchPagination').hidden = true;
+
+  const { ok, data, status } = await api('/api/player/matches?count=50');
+  if (!ok) {
+    body.innerHTML = `<span class="err">${esc(data?.error || status)}</span>`;
+    return;
+  }
+
+  matchState.all  = data.matches || [];
+  matchState.page = 0;
+  renderMatchPage();
+}
+
+// Listeners de paginación
+$('matchPrevBtn').addEventListener('click', () => {
+  if (matchState.page > 0) { matchState.page -= 1; renderMatchPage(); }
+});
+$('matchNextBtn').addEventListener('click', () => {
+  const totalPages = Math.ceil(matchState.all.length / MATCHES_PER_PAGE);
+  if (matchState.page < totalPages - 1) { matchState.page += 1; renderMatchPage(); }
+});
 
 // --- Build --------------------------------------------------------------
 function renderBuild(b) {
