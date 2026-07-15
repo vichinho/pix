@@ -72,7 +72,8 @@ const buildsQuerySchema = z.object({
 const identityQuerySchema = z.object({
   gameName: z.string().min(1).optional(),
   tagLine: z.string().min(1).optional(),
-  count: z.coerce.number().int().min(1).max(20).optional(),
+  /** Máximo 50 para soportar la paginación del historial de partidas en cliente. */
+  count: z.coerce.number().int().min(1).max(50).optional(),
 });
 
 /** Traduce un error de Riot API a un status HTTP y mensaje para el cliente local. */
