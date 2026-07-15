@@ -52,6 +52,37 @@ export interface EnrichedBuild {
 }
 
 /**
+ * Build enriquecida sin iconos (respaldo si el enriquecimiento falla por
+ * completo). Conserva la forma que espera la UI para no romper el render.
+ */
+export function bareEnrichedBuild(build: ChampionBuild): EnrichedBuild {
+  const items = (ids: number[]): EnrichedItem[] =>
+    ids.map((id) => ({ id, name: `#${id}`, icon: null }));
+  const rune = (id: number): EnrichedRune => ({ id, name: `#${id}`, icon: null });
+  return {
+    championId: build.championId,
+    championName: build.championName,
+    role: build.role,
+    runes: {
+      primaryStyle: { name: '', icon: null },
+      secondaryStyle: { name: '', icon: null },
+      keystone: rune(build.runes.keystoneId),
+      primary: build.runes.primary.map(rune),
+      secondary: build.runes.secondary.map(rune),
+      shards: build.runes.shards.map(rune),
+    },
+    skillOrder: build.skillOrder,
+    source: build.source,
+    patch: build.patch,
+    ...(build.notes ? { notes: build.notes } : {}),
+    summoners: build.summonerSpells.map((name) => ({ name, icon: null })),
+    items: { starting: items(build.startingItems), core: items(build.coreItems), situational: items(build.situationalItems) },
+    passive: null,
+    abilities: build.skillOrder.map((letter) => ({ letter, name: letter, icon: null })),
+  };
+}
+
+/**
  * Enriquece una build resolviendo iconos desde Data Dragon: ítems (por id),
  * hechizos de invocador (por nombre) y habilidades del campeón. Si algún dato
  * no está disponible, el icono queda en null y la UI muestra sólo el texto.

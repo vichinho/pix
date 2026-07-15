@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { FallbackBuildProvider, type BuildProvider } from '@/domain/build.js';
 import { SeedBuildProvider } from '@/infrastructure/champions/seed-build-provider.js';
+import { DefaultBuildProvider } from '@/infrastructure/champions/archetype-build-provider.js';
 import { GetChampionBuildUseCase } from '@/application/get-champion-build.js';
 import type { ChampionBuild, Role } from '@/domain/types.js';
 
@@ -75,5 +76,19 @@ describe('GetChampionBuildUseCase', () => {
     const uc = new GetChampionBuildUseCase(new SeedBuildProvider());
     expect(uc.execute(134, 'MIDDLE')?.championName).toBe('Syndra');
     expect(uc.execute(999999, 'MIDDLE')).toBeNull();
+  });
+});
+
+describe('DefaultBuildProvider (nunca falta build)', () => {
+  it('devuelve una build para cualquier championId', () => {
+    const b = new DefaultBuildProvider().getBuild(99999, 'MIDDLE');
+    expect(b.championId).toBe(99999);
+    expect(b.coreItems.length).toBeGreaterThan(0);
+    expect(b.runes.keystoneId).toBeGreaterThan(0);
+  });
+
+  it('la cadena con Default cubre a un campeón sin datos', () => {
+    const chain = new FallbackBuildProvider([new SeedBuildProvider(), new DefaultBuildProvider()]);
+    expect(chain.getBuild(99999, 'BOTTOM')).not.toBeNull();
   });
 });

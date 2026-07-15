@@ -47,7 +47,7 @@ export class ArchetypeBuildProvider implements BuildProvider {
 /**
  * Proveedor de builds genéricas usando el catálogo de Data Dragon: cubre a
  * CUALQUIER campeón (una vez cargado el catálogo), infiriendo el tipo de daño
- * de sus tags/info. Es el último recurso para que nunca falte una sugerencia.
+ * de sus tags/info.
  */
 export class CatalogArchetypeBuildProvider implements BuildProvider {
   readonly name = 'catalog-archetype';
@@ -58,6 +58,18 @@ export class CatalogArchetypeBuildProvider implements BuildProvider {
     const meta = this.catalog.getMeta(championId);
     if (!meta) return null;
     return buildGeneric(championId, meta.name, role, meta.damage);
+  }
+}
+
+/**
+ * Último recurso: build genérica para CUALQUIER championId aunque no haya
+ * metadatos ni catálogo cargado. Garantiza que nunca falte una build en partida.
+ */
+export class DefaultBuildProvider implements BuildProvider {
+  readonly name = 'default';
+
+  getBuild(championId: number, role: Role): ChampionBuild {
+    return buildGeneric(championId, `Campeón ${championId}`, role, 'MIXED');
   }
 }
 

@@ -11,13 +11,14 @@ import { GetRecentMatchesUseCase } from '../application/get-recent-matches.js';
 import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
 import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
 import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
-import { enrichBuild } from '../application/enrich-build.js';
+import { enrichBuild, bareEnrichedBuild } from '../application/enrich-build.js';
 import { GetLiveChampionUseCase } from '../application/get-live-champion.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
 import {
   ArchetypeBuildProvider,
   CatalogArchetypeBuildProvider,
+  DefaultBuildProvider,
 } from '../infrastructure/champions/archetype-build-provider.js';
 import { ChampionCatalog } from '../infrastructure/champions/champion-catalog.js';
 import { FallbackBuildProvider, type BuildProvider } from '../domain/build.js';
@@ -119,6 +120,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       new SeedBuildProvider(),
       new ArchetypeBuildProvider(championTraits),
       new CatalogArchetypeBuildProvider(championCatalog),
+      new DefaultBuildProvider(),
     ]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
   const getLiveChampion = new GetLiveChampionUseCase(liveGameReader, championCatalog);
@@ -163,6 +165,21 @@ export function createServer(deps: ServerDeps = {}): Express {
   const app = express();
   app.use(express.json());
 
+  /**
+   * Envuelve un handler async para que cualquier error se convierta en una
+   * respuesta 500 en vez de un unhandled rejection que deje la petición colgada
+   * (y potencialmente el proceso en mal estado).
+   */
+  const wrap =
+    (fn: (req: Request, res: Response) => Promise<void>) =>
+    (req: Request, res: Response): void => {
+      Promise.resolve(fn(req, res)).catch((err) => {
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'internal_error', message: String(err) });
+        }
+      });
+    };
+
   // UI web estática (dashboard). Se puede desactivar con staticDir: null.
   const staticDir =
     deps.staticDir === null
@@ -176,14 +193,17 @@ export function createServer(deps: ServerDeps = {}): Express {
     res.json({ ok: true });
   });
 
-  app.get('/api/champions', async (_req: Request, res: Response) => {
-    const data = await championCatalog.getData();
-    if (!data) {
-      res.status(503).json({ error: 'catalog_unavailable' });
-      return;
-    }
-    res.json(data);
-  });
+  app.get(
+    '/api/champions',
+    wrap(async (_req: Request, res: Response) => {
+      const data = await championCatalog.getData().catch(() => null);
+      if (!data) {
+        res.status(503).json({ error: 'catalog_unavailable' });
+        return;
+      }
+      res.json(data);
+    }),
+  );
 
   app.get('/api/client/status', async (_req: Request, res: Response) => {
     try {
@@ -353,21 +373,31 @@ export function createServer(deps: ServerDeps = {}): Express {
     }
   });
 
-  app.get('/api/builds', async (req: Request, res: Response) => {
-    const parsed = buildsQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
-      return;
-    }
-    // Asegura el catálogo cargado para poder inferir la build genérica de cualquier campeón.
-    await championCatalog.getData();
-    const build = getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
-    if (!build) {
-      res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });
-      return;
-    }
-    res.json(await enrichBuild(build, championCatalog));
-  });
+  app.get(
+    '/api/builds',
+    wrap(async (req: Request, res: Response) => {
+      const parsed = buildsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+        return;
+      }
+      // Asegura el catálogo (best-effort) para inferir la build de cualquier campeón.
+      await championCatalog.getData().catch(() => null);
+      // getChampionBuild siempre devuelve una build (DefaultBuildProvider como último recurso).
+      const build = getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
+      if (!build) {
+        res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });
+        return;
+      }
+      // El enriquecimiento (iconos) no debe tumbar la respuesta: si falla, se
+      // devuelve la build sin iconos resueltos.
+      try {
+        res.json(await enrichBuild(build, championCatalog));
+      } catch {
+        res.json(bareEnrichedBuild(build));
+      }
+    }),
+  );
 
   // Rutas planificadas en la especificación, aún no implementadas.
   const notImplemented = (name: string) => (_req: Request, res: Response) => {

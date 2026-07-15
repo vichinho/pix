@@ -76,31 +76,45 @@ export interface ChampionCatalogOptions {
   locale?: string;
   /** Tiempo de vida de la cache en ms (por defecto 24h). */
   ttlMs?: number;
+  /** Timeout por request al CDN (por defecto 8s). */
+  fetchTimeoutMs?: number;
+  /** Cooldown antes de reintentar tras un fallo (por defecto 30s). */
+  retryCooldownMs?: number;
 }
 
 export class ChampionCatalog {
   private readonly fetchImpl: CatalogFetch;
   private readonly locale: string;
   private readonly ttlMs: number;
+  private readonly retryCooldownMs: number;
   private data: ChampionCatalogData | null = null;
   private byId = new Map<number, ChampionMeta>();
   private byName = new Map<string, number>();
   private byDdragonId = new Map<string, number>();
   private loadedAt = 0;
+  private lastAttemptAt = 0;
   private inflight: Promise<ChampionCatalogData | null> | null = null;
   private items = new Map<number, ItemEntry>();
   private itemsLoadedAt = 0;
+  private itemsAttemptAt = 0;
   private itemsInflight: Promise<void> | null = null;
   private spellCache = new Map<number, ChampionSpells>();
+  private spellAttemptAt = new Map<number, number>();
   private runes = new Map<number, RuneAsset>();
   private runeStyles = new Map<number, RuneAsset>();
   private runesLoadedAt = 0;
+  private runesAttemptAt = 0;
   private runesInflight: Promise<void> | null = null;
 
   constructor(opts: ChampionCatalogOptions = {}) {
-    this.fetchImpl = opts.fetchImpl ?? (globalThis.fetch as unknown as CatalogFetch);
+    const timeoutMs = opts.fetchTimeoutMs ?? 8000;
+    this.fetchImpl =
+      opts.fetchImpl ??
+      ((url: string) =>
+        (globalThis.fetch as typeof fetch)(url, { signal: AbortSignal.timeout(timeoutMs) }));
     this.locale = opts.locale ?? 'en_US';
     this.ttlMs = opts.ttlMs ?? 24 * 60 * 60 * 1000;
+    this.retryCooldownMs = opts.retryCooldownMs ?? 30_000;
   }
 
   private async fetchJson<T>(url: string): Promise<T> {
@@ -187,6 +201,11 @@ export class ChampionCatalog {
   async getData(): Promise<ChampionCatalogData | null> {
     const fresh = this.data && Date.now() - this.loadedAt < this.ttlMs;
     if (fresh) return this.data;
+    // Tras un fallo, no reintentamos en cada petición (evita colgar builds).
+    if (!this.inflight && Date.now() - this.lastAttemptAt < this.retryCooldownMs) {
+      return this.data;
+    }
+    this.lastAttemptAt = Date.now();
     this.inflight ??= this.loadFresh().finally(() => {
       this.inflight = null;
     });
@@ -205,6 +224,8 @@ export class ChampionCatalog {
     if (!data) return;
     const fresh = this.items.size > 0 && Date.now() - this.itemsLoadedAt < this.ttlMs;
     if (fresh) return;
+    if (!this.itemsInflight && Date.now() - this.itemsAttemptAt < this.retryCooldownMs) return;
+    this.itemsAttemptAt = Date.now();
     this.itemsInflight ??= this.loadItems(data.version).finally(() => {
       this.itemsInflight = null;
     });
@@ -245,6 +266,9 @@ export class ChampionCatalog {
   async getChampionSpells(championId: number): Promise<ChampionSpells | null> {
     const cached = this.spellCache.get(championId);
     if (cached) return cached;
+    // Cooldown por campeón tras un fallo, para no reintentar en cada petición.
+    if (Date.now() - (this.spellAttemptAt.get(championId) ?? 0) < this.retryCooldownMs) return null;
+    this.spellAttemptAt.set(championId, Date.now());
     const data = await this.getData();
     const meta = this.byId.get(championId);
     if (!data || !meta) return null;
@@ -295,6 +319,8 @@ export class ChampionCatalog {
     if (!data) return;
     const fresh = this.runes.size > 0 && Date.now() - this.runesLoadedAt < this.ttlMs;
     if (fresh) return;
+    if (!this.runesInflight && Date.now() - this.runesAttemptAt < this.retryCooldownMs) return;
+    this.runesAttemptAt = Date.now();
     this.runesInflight ??= this.loadRunes(data.version).finally(() => {
       this.runesInflight = null;
     });
