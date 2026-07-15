@@ -45,6 +45,25 @@ function champChip(id, size = 22) {
   return `<span class="chip">${e ? esc(e.name) : '#' + esc(id)}</span>`;
 }
 
+// Helpers de iconos para builds enriquecidas (ítems, hechizos, habilidades).
+function iconOrText(entry, cls) {
+  if (entry.icon) {
+    return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" title="${esc(entry.name)}" loading="lazy"/>`;
+  }
+  return `<span class="tag">${esc(entry.name)}</span>`;
+}
+const itemRow = (items) => (items || []).map((i) => iconOrText(i, 'iicon')).join(' ');
+const summRow = (sums) => (sums || []).map((s) => iconOrText(s, 'sicon')).join(' ');
+function abilityRow(abils) {
+  return (abils || [])
+    .map(
+      (a) =>
+        `<span class="abil">${a.icon ? `<img class="sicon" src="${esc(a.icon)}" alt="${esc(a.name)}" title="${esc(a.name)}" loading="lazy"/>` : ''}<span class="ablabel">${esc(a.letter)}</span></span>`,
+    )
+    .join('<span class="arrow">›</span>');
+}
+const runeTags = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join(' ');
+
 // --- Estado de cliente y Riot ------------------------------------------
 let riotConfigured = false;
 let clientConnected = false;
@@ -179,16 +198,18 @@ function reasonEs(r) {
 
 // --- Build --------------------------------------------------------------
 function renderBuild(b) {
-  const list = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join('');
+  const passive = b.passive
+    ? `<span class="abil">${b.passive.icon ? `<img class="sicon" src="${esc(b.passive.icon)}" alt="${esc(b.passive.name)}" title="${esc(b.passive.name)}" loading="lazy"/>` : ''}<span class="ablabel">P</span></span>`
+    : '';
   return `
     <div class="kv"><span class="k">Campeón</span><span>${champChip(b.championId, 22)} · ${esc(ROLE_ES[b.role] || b.role)}</span>
-      <span class="k">Hechizos</span><span>${esc((b.summonerSpells || []).join(' + '))}</span>
-      <span class="k">Skill order</span><span>${esc((b.skillOrder || []).join(' > '))}</span></div>
+      <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
+      <span class="k">Habilidades</span><span class="iconrow">${passive}${passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span></div>
     <div class="build-block"><div class="label">Runas</div>
-      <div>${esc(b.runes.keystone)} <span class="muted">(${esc(b.runes.primaryStyle)})</span> — ${list(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}</span> ${list(b.runes.secondary)} · ${list(b.runes.shards)}</div></div>
-    <div class="build-block"><div class="label">Ítems iniciales</div><div>${list(b.startingItems)}</div></div>
-    <div class="build-block"><div class="label">Core</div><div>${list(b.coreItems)}</div></div>
-    <div class="build-block"><div class="label">Situacionales</div><div>${list(b.situationalItems)}</div></div>
+      <div>${esc(b.runes.keystone)} <span class="muted">(${esc(b.runes.primaryStyle)})</span> — ${runeTags(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}</span> ${runeTags(b.runes.secondary)} · ${runeTags(b.runes.shards)}</div></div>
+    <div class="build-block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
+    <div class="build-block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
+    <div class="build-block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div></div>
     ${b.notes ? `<div class="muted" style="margin-top:.5rem">💡 ${esc(b.notes)}</div>` : ''}
     <div class="muted" style="margin-top:.4rem">Fuente: ${esc(b.source)} · ${esc(b.patch)}</div>`;
 }
@@ -222,13 +243,13 @@ async function refreshContext(clientState) {
 }
 
 function renderRunesSummoners(b) {
-  const list = (arr) => (arr || []).map((x) => `<span class="tag">${esc(x)}</span>`).join(' ');
   return `<div class="kv">
-      <span class="k">Hechizos</span><span>${esc((b.summonerSpells || []).join(' + '))}</span>
+      <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
+      <span class="k">Habilidades</span><span class="iconrow">${abilityRow(b.abilities)}</span>
       <span class="k">Keystone</span><span>${esc(b.runes.keystone)} <span class="muted">(${esc(b.runes.primaryStyle)})</span></span>
     </div>
-    <div style="margin-top:.3rem">${list(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}:</span> ${list(b.runes.secondary)} · ${list(b.runes.shards)}</div>
-    <div class="muted" style="margin-top:.35rem">Skill: ${esc((b.skillOrder || []).join(' > '))} · fuente: ${esc(b.source)}</div>`;
+    <div style="margin-top:.3rem">${runeTags(b.runes.primary)} · <span class="muted">${esc(b.runes.secondaryStyle)}:</span> ${runeTags(b.runes.secondary)} · ${runeTags(b.runes.shards)}</div>
+    <div class="muted" style="margin-top:.35rem">Fuente: ${esc(b.source)}</div>`;
 }
 
 async function refreshChampSelect() {

@@ -11,6 +11,7 @@ import { GetRecentMatchesUseCase } from '../application/get-recent-matches.js';
 import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
 import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
 import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
+import { enrichBuild } from '../application/enrich-build.js';
 import { GetLiveChampionUseCase } from '../application/get-live-champion.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
@@ -365,7 +366,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });
       return;
     }
-    res.json(build);
+    res.json(await enrichBuild(build, championCatalog));
   });
 
   // Rutas planificadas en la especificación, aún no implementadas.

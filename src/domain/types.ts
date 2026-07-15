@@ -155,16 +155,17 @@ export interface RuneSelection {
   shards: string[];
 }
 
-/** Contrato: build del campeón (GET /api/builds). */
+/** Contrato interno de build: ítems como IDs de Data Dragon (se resuelven a
+ * icono/nombre en la capa de API). */
 export interface ChampionBuild {
   championId: number;
   championName: string;
   role: Role;
   summonerSpells: string[];
   runes: RuneSelection;
-  startingItems: string[];
-  coreItems: string[];
-  situationalItems: string[];
+  startingItems: number[];
+  coreItems: number[];
+  situationalItems: number[];
   /** Prioridad de subida de habilidades, p.ej. ["Q", "E", "W"]. */
   skillOrder: string[];
   /** Origen de la build ("curated", nombre del proveedor externo, etc.). */

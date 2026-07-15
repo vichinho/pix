@@ -1,0 +1,48 @@
+/**
+ * IDs de ítems de Data Dragon usados por las builds. Referenciar por ID (no por
+ * nombre) permite resolver icono y nombre localizado desde el CDN de forma
+ * fiable e independiente del idioma.
+ */
+export const ITEM = {
+  // Consumibles / iniciales
+  HEALTH_POTION: 2003,
+  DORANS_RING: 1056,
+  DORANS_BLADE: 1055,
+  DORANS_SHIELD: 1054,
+  WORLD_ATLAS: 3865,
+  // Botas
+  SORCERERS_SHOES: 3020,
+  IONIAN_BOOTS: 3158,
+  PLATED_STEELCAPS: 3047,
+  MERCURYS_TREADS: 3111,
+  BERSERKERS_GREAVES: 3006,
+  // AP
+  LUDENS_COMPANION: 6655,
+  SHADOWFLAME: 4645,
+  RABADONS_DEATHCAP: 3089,
+  VOID_STAFF: 3135,
+  ZHONYAS_HOURGLASS: 3157,
+  HORIZON_FOCUS: 4628,
+  RIFTMAKER: 4633,
+  COSMIC_DRIVE: 4629,
+  LIANDRYS_TORMENT: 6653,
+  RYLAIS_SCEPTER: 3116,
+  // AD / asesino
+  ECLIPSE: 6692,
+  YOUMUUS_GHOSTBLADE: 3142,
+  SERYLDAS_GRUDGE: 6694,
+  EDGE_OF_NIGHT: 3814,
+  DEATHS_DANCE: 6333,
+  // Enchantador
+  MOONSTONE_RENEWER: 6617,
+  STAFF_OF_FLOWING_WATER: 6616,
+  ARDENT_CENSER: 3504,
+  REDEMPTION: 3107,
+  MIKAELS_BLESSING: 3222,
+  // Tanque
+  LOCKET_SOLARI: 3190,
+  KNIGHTS_VOW: 3109,
+  ZEKES_CONVERGENCE: 3050,
+  FROZEN_HEART: 3110,
+  SUNFIRE_AEGIS: 3068,
+} as const;

@@ -2,6 +2,7 @@ import type { BuildProvider } from '../../domain/build.js';
 import type { ChampionTraitProvider, DamageType } from '../../domain/aram.js';
 import type { ChampionBuild, Role, RuneSelection } from '../../domain/types.js';
 import type { ChampionCatalog } from './champion-catalog.js';
+import { ITEM } from './item-ids.js';
 
 /** Arma una build genérica sensata a partir del tipo de daño y el rol. */
 export function buildGeneric(
@@ -100,21 +101,21 @@ function runesFor(damage: DamageType): RuneSelection {
   };
 }
 
-function startingFor(damage: DamageType): string[] {
-  if (damage === 'AP') return ['Anillo de Doran', 'Poción de Salud'];
-  if (damage === 'NONE') return ['Reliquia del Escudo de Acero', 'Poción de Salud'];
-  return ['Espada de Doran', 'Poción de Salud'];
+function startingFor(damage: DamageType): number[] {
+  if (damage === 'AP') return [ITEM.DORANS_RING, ITEM.HEALTH_POTION];
+  if (damage === 'NONE') return [ITEM.DORANS_SHIELD, ITEM.HEALTH_POTION];
+  return [ITEM.DORANS_BLADE, ITEM.HEALTH_POTION];
 }
 
-function coreFor(damage: DamageType): string[] {
-  if (damage === 'AP') return ['Botas de Hechicero', 'Objeto mítico AP'];
-  if (damage === 'NONE') return ['Botas de Placas de Acero', 'Objeto de aguante'];
-  return ['Botas de Movilidad Ionianas', 'Objeto mítico AD'];
+function coreFor(damage: DamageType): number[] {
+  if (damage === 'AP') return [ITEM.SORCERERS_SHOES, ITEM.LUDENS_COMPANION];
+  if (damage === 'NONE') return [ITEM.PLATED_STEELCAPS, ITEM.SUNFIRE_AEGIS];
+  return [ITEM.IONIAN_BOOTS, ITEM.ECLIPSE];
 }
 
-function situationalFor(damage: DamageType): string[] {
+function situationalFor(damage: DamageType): number[] {
   if (damage === 'AP')
-    return ['Sombrero Mortal de Rabadon', 'Bastón del Vacío', 'Reloj de Arena de Zhonya'];
-  if (damage === 'NONE') return ['Relicario del Sol Naciente', 'Redención', 'Corazón Helado'];
-  return ['Rencor de Serylda', 'Danza de la Muerte', 'Filo de la Noche'];
+    return [ITEM.RABADONS_DEATHCAP, ITEM.VOID_STAFF, ITEM.ZHONYAS_HOURGLASS];
+  if (damage === 'NONE') return [ITEM.LOCKET_SOLARI, ITEM.REDEMPTION, ITEM.FROZEN_HEART];
+  return [ITEM.SERYLDAS_GRUDGE, ITEM.DEATHS_DANCE, ITEM.EDGE_OF_NIGHT];
 }

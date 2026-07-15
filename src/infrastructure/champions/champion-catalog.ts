@@ -31,7 +31,30 @@ export interface ChampionCatalogData {
   version: string;
   /** Base para construir URLs de icono: iconBase + entry.image */
   iconBase: string;
+  itemIconBase: string;
+  spellIconBase: string;
+  passiveIconBase: string;
   champions: ChampionCatalogEntry[];
+}
+
+export interface ItemEntry {
+  id: number;
+  name: string;
+  image: string;
+}
+
+export interface AbilityAsset {
+  name: string;
+  image: string;
+}
+
+/** Habilidades del campeón (pasiva + Q/W/E/R). */
+export interface ChampionSpells {
+  passive: AbilityAsset | null;
+  Q: AbilityAsset | null;
+  W: AbilityAsset | null;
+  E: AbilityAsset | null;
+  R: AbilityAsset | null;
 }
 
 export type CatalogFetch = (
@@ -58,6 +81,10 @@ export class ChampionCatalog {
   private byDdragonId = new Map<string, number>();
   private loadedAt = 0;
   private inflight: Promise<ChampionCatalogData | null> | null = null;
+  private items = new Map<number, ItemEntry>();
+  private itemsLoadedAt = 0;
+  private itemsInflight: Promise<void> | null = null;
+  private spellCache = new Map<number, ChampionSpells>();
 
   constructor(opts: ChampionCatalogOptions = {}) {
     this.fetchImpl = opts.fetchImpl ?? (globalThis.fetch as unknown as CatalogFetch);
@@ -94,6 +121,9 @@ export class ChampionCatalog {
       this.data = {
         version,
         iconBase: `${DDRAGON}/cdn/${version}/img/champion/`,
+        itemIconBase: `${DDRAGON}/cdn/${version}/img/item/`,
+        spellIconBase: `${DDRAGON}/cdn/${version}/img/spell/`,
+        passiveIconBase: `${DDRAGON}/cdn/${version}/img/passive/`,
         champions: metas.map((m) => ({ id: m.id, name: m.name, image: m.image })),
       };
       this.byId = new Map(metas.map((m) => [m.id, m]));
@@ -155,6 +185,96 @@ export class ChampionCatalog {
   async name(championId: number): Promise<string | null> {
     await this.getData();
     return this.byId.get(championId)?.name ?? null;
+  }
+
+  /** Asegura cargado el catálogo de ítems (item.json). */
+  async ensureItems(): Promise<void> {
+    const data = await this.getData();
+    if (!data) return;
+    const fresh = this.items.size > 0 && Date.now() - this.itemsLoadedAt < this.ttlMs;
+    if (fresh) return;
+    this.itemsInflight ??= this.loadItems(data.version).finally(() => {
+      this.itemsInflight = null;
+    });
+    return this.itemsInflight;
+  }
+
+  private async loadItems(version: string): Promise<void> {
+    try {
+      const raw = await this.fetchItems(version, this.locale).catch(() =>
+        this.locale === 'en_US' ? null : this.fetchItems(version, 'en_US'),
+      );
+      if (!raw) return;
+      this.items = new Map(
+        Object.entries(raw.data).map(([id, v]) => [
+          Number(id),
+          { id: Number(id), name: v.name, image: v.image.full },
+        ]),
+      );
+      this.itemsLoadedAt = Date.now();
+    } catch {
+      // Ítems no disponibles: se resolverán como id crudo.
+    }
+  }
+
+  private fetchItems(
+    version: string,
+    locale: string,
+  ): Promise<{ data: Record<string, { name: string; image: { full: string } }> }> {
+    return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/item.json`);
+  }
+
+  /** Ítem por id si el catálogo de ítems ya está cargado. */
+  getItemSync(itemId: number): ItemEntry | null {
+    return this.items.get(itemId) ?? null;
+  }
+
+  /** Habilidades del campeón (pasiva + Q/W/E/R), cacheadas por campeón. */
+  async getChampionSpells(championId: number): Promise<ChampionSpells | null> {
+    const cached = this.spellCache.get(championId);
+    if (cached) return cached;
+    const data = await this.getData();
+    const meta = this.byId.get(championId);
+    if (!data || !meta) return null;
+    try {
+      const raw = await this.fetchChampionDetail(data.version, this.locale, meta.ddragonId).catch(
+        () =>
+          this.locale === 'en_US'
+            ? null
+            : this.fetchChampionDetail(data.version, 'en_US', meta.ddragonId),
+      );
+      const cd = raw?.data[meta.ddragonId];
+      if (!cd) return null;
+      const asset = (a?: { name: string; image: { full: string } }): AbilityAsset | null =>
+        a ? { name: a.name, image: a.image.full } : null;
+      const spells: ChampionSpells = {
+        passive: asset(cd.passive),
+        Q: asset(cd.spells?.[0]),
+        W: asset(cd.spells?.[1]),
+        E: asset(cd.spells?.[2]),
+        R: asset(cd.spells?.[3]),
+      };
+      this.spellCache.set(championId, spells);
+      return spells;
+    } catch {
+      return null;
+    }
+  }
+
+  private fetchChampionDetail(
+    version: string,
+    locale: string,
+    ddragonId: string,
+  ): Promise<{
+    data: Record<
+      string,
+      {
+        spells?: Array<{ name: string; image: { full: string } }>;
+        passive?: { name: string; image: { full: string } };
+      }
+    >;
+  }> {
+    return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/champion/${ddragonId}.json`);
   }
 }
 

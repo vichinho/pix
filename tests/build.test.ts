@@ -29,9 +29,9 @@ describe('SeedBuildProvider', () => {
 
   it('entrega copias (no muta la seed)', () => {
     const a = provider.getBuild(101, 'MIDDLE')!;
-    a.coreItems.push('HACK');
+    a.coreItems.push(99999);
     const b = provider.getBuild(101, 'MIDDLE')!;
-    expect(b.coreItems).not.toContain('HACK');
+    expect(b.coreItems).not.toContain(99999);
   });
 
   it('coveredChampionIds incluye el pool curado', () => {
@@ -52,7 +52,7 @@ describe('FallbackBuildProvider', () => {
     summonerSpells: ['Flash'],
     runes: { primaryStyle: 'a', keystone: 'k', primary: [], secondaryStyle: 'b', secondary: [], shards: [] },
     startingItems: [],
-    coreItems: ['i'],
+    coreItems: [3089],
     situationalItems: [],
     skillOrder: ['Q'],
     source: 'ext',

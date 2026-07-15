@@ -119,6 +119,13 @@ th { color: var(--muted); font-weight: 600; }
 .cicon { border-radius: 6px; border: 1px solid var(--border); object-fit: cover; vertical-align: middle; background: var(--panel-2); }
 .pickhead { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.4rem; }
 
+.iconrow { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.iicon { width: 34px; height: 34px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); }
+.sicon { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); }
+.abil { display: inline-flex; align-items: center; gap: 0.2rem; }
+.ablabel { font-size: 0.72rem; color: var(--accent); font-weight: 700; }
+.arrow { color: var(--muted); margin: 0 0.15rem; }
+
 .build-block { margin-top: 0.6rem; }
 .build-block .label { color: var(--accent-2); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; }
 .spinner { color: var(--muted); font-size: 0.85rem; }
