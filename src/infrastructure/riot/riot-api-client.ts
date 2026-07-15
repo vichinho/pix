@@ -22,8 +22,23 @@ export interface RiotAccountDto {
 /** Invocador (summoner-v4). */
 export interface RiotSummonerDto {
   puuid: string;
+  id: string;  // summonerId (encryptedId) necesario para league-v4
   summonerLevel: number;
   profileIconId: number;
+}
+
+/** Entrada de liga (league-v4 entry). */
+export interface RiotLeagueEntryDto {
+  queueType: string;   // RANKED_SOLO_5x5 | RANKED_FLEX_SR | ...
+  tier: string;
+  rank: string;        // I | II | III | IV
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  veteran?: boolean;
+  inactive?: boolean;
+  freshBlood?: boolean;
+  hotStreak?: boolean;
 }
 
 /** Detalle de partida (match-v5), parcial. */
@@ -53,18 +68,12 @@ export interface RiotParticipantDto {
 /** Normaliza la posición (mayúsculas de match-v5) a nuestro Role. */
 export function mapTeamPosition(position: string | undefined): Role {
   switch ((position ?? '').toUpperCase()) {
-    case 'TOP':
-      return 'TOP';
-    case 'JUNGLE':
-      return 'JUNGLE';
-    case 'MIDDLE':
-      return 'MIDDLE';
-    case 'BOTTOM':
-      return 'BOTTOM';
-    case 'UTILITY':
-      return 'UTILITY';
-    default:
-      return 'UNKNOWN';
+    case 'TOP':     return 'TOP';
+    case 'JUNGLE':  return 'JUNGLE';
+    case 'MIDDLE':  return 'MIDDLE';
+    case 'BOTTOM':  return 'BOTTOM';
+    case 'UTILITY': return 'UTILITY';
+    default:        return 'UNKNOWN';
   }
 }
 
@@ -82,23 +91,14 @@ export type FetchLike = (
 
 export interface RiotApiClientOptions {
   apiKey: string;
-  /** Routing de plataforma para summoner-v4 (la1, na1, euw1, …). */
   platform: string;
-  /** Routing regional para account-v1 y match-v5 (americas, asia, europe). */
   region: string;
   fetchImpl?: FetchLike;
-  /** Reintentos ante 429 (rate limit). Por defecto 3. */
   maxRetries?: number;
-  /** Concurrencia máxima al traer partidas en lote. Por defecto 5. */
   matchConcurrency?: number;
-  /** Función de espera (inyectable para tests). */
   sleepImpl?: (ms: number) => Promise<void>;
 }
 
-/**
- * Cliente de la Riot API oficial. Usa routing de plataforma para summoner-v4 y
- * routing regional para account-v1 y match-v5.
- */
 export class RiotApiClient {
   private readonly apiKey: string;
   readonly platform: string;
@@ -107,7 +107,6 @@ export class RiotApiClient {
   private readonly maxRetries: number;
   private readonly matchConcurrency: number;
   private readonly sleep: (ms: number) => Promise<void>;
-  /** Cache de partidas (inmutables una vez jugadas) para evitar refetch. */
   private readonly matchCache = new Map<string, RiotMatchDto>();
 
   constructor(opts: RiotApiClientOptions) {
@@ -117,8 +116,7 @@ export class RiotApiClient {
     this.fetchImpl = opts.fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
     this.maxRetries = opts.maxRetries ?? 3;
     this.matchConcurrency = Math.max(1, opts.matchConcurrency ?? 5);
-    this.sleep =
-      opts.sleepImpl ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep = opts.sleepImpl ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   private async request<T>(host: string, path: string): Promise<T> {
@@ -126,10 +124,7 @@ export class RiotApiClient {
     for (let attempt = 0; ; attempt += 1) {
       const res = await this.fetchImpl(url, { headers: { 'X-Riot-Token': this.apiKey } });
       const body = await res.text();
-      if (res.ok) {
-        return JSON.parse(body) as T;
-      }
-      // Ante 429, respeta Retry-After y reintenta hasta agotar los intentos.
+      if (res.ok) return JSON.parse(body) as T;
       if (res.status === 429 && attempt < this.maxRetries) {
         const retryAfter = Number(res.headers?.get('Retry-After') ?? '1');
         const waitMs = (Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 1) * 1000;
@@ -140,18 +135,11 @@ export class RiotApiClient {
     }
   }
 
-  private platformHost(): string {
-    return `${this.platform}.api.riotgames.com`;
-  }
-
-  private regionHost(): string {
-    return `${this.region}.api.riotgames.com`;
-  }
+  private platformHost(): string { return `${this.platform}.api.riotgames.com`; }
+  private regionHost():   string { return `${this.region}.api.riotgames.com`; }
 
   getAccountByRiotId(gameName: string, tagLine: string): Promise<RiotAccountDto> {
-    const path = `/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(
-      gameName,
-    )}/${encodeURIComponent(tagLine)}`;
+    const path = `/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
     return this.request<RiotAccountDto>(this.regionHost(), path);
   }
 
@@ -160,10 +148,18 @@ export class RiotApiClient {
     return this.request<RiotSummonerDto>(this.platformHost(), path);
   }
 
+  /**
+   * league-v4: entradas clasificatorias del invocador.
+   * Devuelve arreglo vacío si no tiene partidas clasificatorias.
+   * Requiere el encryptedSummonerId (campo `id` de summoner-v4).
+   */
+  getLeagueEntries(summonerId: string): Promise<RiotLeagueEntryDto[]> {
+    const path = `/lol/league/v4/entries/by-summoner/${encodeURIComponent(summonerId)}`;
+    return this.request<RiotLeagueEntryDto[]>(this.platformHost(), path);
+  }
+
   getMatchIdsByPuuid(puuid: string, count: number): Promise<string[]> {
-    const path = `/lol/match/v5/matches/by-puuid/${encodeURIComponent(
-      puuid,
-    )}/ids?start=0&count=${count}`;
+    const path = `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?start=0&count=${count}`;
     return this.request<string[]>(this.regionHost(), path);
   }
 
@@ -176,10 +172,6 @@ export class RiotApiClient {
     return match;
   }
 
-  /**
-   * Trae varias partidas respetando un límite de concurrencia para no saturar el
-   * rate limit. Aprovecha la cache y preserva el orden de `matchIds`.
-   */
   async getMatches(matchIds: string[]): Promise<RiotMatchDto[]> {
     const results = new Array<RiotMatchDto>(matchIds.length);
     let next = 0;

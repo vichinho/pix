@@ -26,6 +26,22 @@ export interface SummonerSummary {
   profileIconId?: number;
 }
 
+/** Entrada de liga para una cola clasificatoria. */
+export interface RankedEntry {
+  tier: string;        // IRON | BRONZE | SILVER | GOLD | PLATINUM | EMERALD | DIAMOND | MASTER | GRANDMASTER | CHALLENGER
+  division: string;    // I | II | III | IV (vacío para Master+)
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+}
+
+/** Mejor liga histórica conocida. */
+export interface PeakRank {
+  tier: string;
+  division: string;
+  year?: number;  // año de la temporada (si lo tenemos)
+}
+
 /** Perfil del jugador resuelto vía Riot API (GET /api/player/profile). */
 export interface PlayerProfile {
   puuid: string;
@@ -34,6 +50,12 @@ export interface PlayerProfile {
   summonerLevel: number | null;
   profileIconId: number | null;
   region: string;
+  /** Cola solo/dúo, null si no clasificado. */
+  soloQueue: RankedEntry | null;
+  /** Cola flex, null si no clasificado. */
+  flexQueue: RankedEntry | null;
+  /** Mejor liga histórica derivada de los datos actuales, null si sin datos. */
+  peakRank: PeakRank | null;
 }
 
 /** Resumen de una partida reciente (GET /api/player/matches). */
@@ -88,8 +110,6 @@ export interface ChampSelectSnapshot {
 
 /**
  * Categoría semántica del tipo de partida, derivada del queueId del cliente.
- * - CASUAL_SWIFTPLAY: eliges rol y campeón en la sala, sin fase de bloqueos (Swiftplay/Quickplay).
- * - NORMAL_DRAFT: normal/\"reclutamiento\", champ select con picks y bans.
  */
 export type GameQueueCategory =
   | 'CASUAL_SWIFTPLAY'
@@ -109,25 +129,15 @@ export type GameQueueCategory =
  * Contrato: GET /api/game/queue.
  */
 export interface GameQueueInfo {
-  /** queueId de Riot (-1/0 si no aplica). */
   queueId: number;
-  /** Categoría semántica clasificada. */
   category: GameQueueCategory;
-  /** Etiqueta legible en español para la UI. */
   label: string;
-  /** ¿Es una cola clasificatoria (solo/dúo o flex)? */
   isRanked: boolean;
-  /** ¿Es la Herramienta de práctica? */
   isPracticeTool: boolean;
-  /** ¿Es una partida personalizada (custom, no matchmaking)? */
   isCustom: boolean;
-  /** gameMode reportado por el cliente (CLASSIC, ARAM, PRACTICETOOL, …). */
   gameMode: string | null;
-  /** mapId de la partida. */
   mapId: number | null;
-  /** Nombre localizado de la cola tal como lo reporta el cliente. */
   rawName: string | null;
-  /** Tipo de cola crudo del cliente (p.ej. RANKED_SOLO_5x5). */
   rawType: string | null;
 }
 
@@ -145,22 +155,17 @@ export interface RecommendationsResponse {
   recommendations: ChampionRecommendation[];
 }
 
-/** Página de runas referenciada por IDs de Data Dragon (se resuelven a
- * icono/nombre en la capa de API). */
+/** Página de runas referenciada por IDs de Data Dragon. */
 export interface RuneSelection {
   primaryStyleId: number;
   secondaryStyleId: number;
   keystoneId: number;
-  /** 3 runas del árbol primario (filas 1-3), en orden. */
   primary: number[];
-  /** 2 runas del árbol secundario, en orden. */
   secondary: number[];
-  /** 3 fragmentos (ofensivo, flexible, defensivo). */
   shards: number[];
 }
 
-/** Contrato interno de build: ítems como IDs de Data Dragon (se resuelven a
- * icono/nombre en la capa de API). */
+/** Contrato interno de build. */
 export interface ChampionBuild {
   championId: number;
   championName: string;
@@ -170,12 +175,8 @@ export interface ChampionBuild {
   startingItems: number[];
   coreItems: number[];
   situationalItems: number[];
-  /** Prioridad de subida de habilidades, p.ej. [\"Q\", \"E\", \"W\"]. */
   skillOrder: string[];
-  /** Origen de la build (\"curated\", nombre del proveedor externo, etc.). */
   source: string;
-  /** Parche o versión de referencia de la build. */
   patch: string;
-  /** Nota breve opcional para el jugador. */
   notes?: string;
 }
