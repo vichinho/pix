@@ -16,7 +16,7 @@ export type ClientState =
   | 'UNKNOWN';
 
 /** Roles / líneas soportados. */
-export type Role = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | 'UNKNOWN';
+export type Role = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | 'ARAM' | 'UNKNOWN';
 
 /** Resumen mínimo del invocador local. */
 export interface SummonerSummary {
@@ -89,7 +89,7 @@ export interface ChampSelectSnapshot {
 /**
  * Categoría semántica del tipo de partida, derivada del queueId del cliente.
  * - CASUAL_SWIFTPLAY: eliges rol y campeón en la sala, sin fase de bloqueos (Swiftplay/Quickplay).
- * - NORMAL_DRAFT: normal/"reclutamiento", champ select con picks y bans.
+ * - NORMAL_DRAFT: normal/\"reclutamiento\", champ select con picks y bans.
  */
 export type GameQueueCategory =
   | 'CASUAL_SWIFTPLAY'
@@ -170,9 +170,9 @@ export interface ChampionBuild {
   startingItems: number[];
   coreItems: number[];
   situationalItems: number[];
-  /** Prioridad de subida de habilidades, p.ej. ["Q", "E", "W"]. */
+  /** Prioridad de subida de habilidades, p.ej. [\"Q\", \"E\", \"W\"]. */
   skillOrder: string[];
-  /** Origen de la build ("curated", nombre del proveedor externo, etc.). */
+  /** Origen de la build (\"curated\", nombre del proveedor externo, etc.). */
   source: string;
   /** Parche o versión de referencia de la build. */
   patch: string;
