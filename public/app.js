@@ -179,19 +179,44 @@ function renderRunes(runes) {
 
 // --- Ranked helpers -----------------------------------------------------
 
-function rankEmblemUrl(tier) {
-  if (!tier) return null;
-  const t = tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
-  return `https://ddragon.leagueoflegends.com/cdn/img/ranked-emblems/Emblem_${t}.png`;
+/**
+ * Fuentes de emblemas de rango. Data Dragon NO sirve estos emblemas por URL
+ * (sólo en un zip descargable), por eso no cargaban. Usamos CommunityDragon y
+ * op.gg como respaldo, con cascada de errores en el <img>.
+ */
+function rankEmblemSources(tier) {
+  const t = (tier || '').toLowerCase();
+  return [
+    `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${t}.png`,
+    `https://opgg-static.akamaized.net/images/medals_new/${t}.png`,
+    `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-regalia/${t}.png`,
+  ];
+}
+
+/** Construye el <img> del emblema con cascada de fuentes de respaldo. */
+function rankEmblemImg(tier, cls = '') {
+  if (!tier) return `<div class="rank-emblem-placeholder"></div>`;
+  const srcs = rankEmblemSources(tier);
+  const rest = srcs.slice(1).join('|');
+  return `<img class="${cls}" src="${esc(srcs[0])}" alt="${esc(tier)}" loading="lazy"
+    data-fallbacks="${esc(rest)}" onerror="emblemFallback(this)" />`;
+}
+
+/** Al fallar una fuente de emblema, prueba la siguiente; si no hay, la oculta. */
+function emblemFallback(img) {
+  const list = (img.dataset.fallbacks || '').split('|').filter(Boolean);
+  if (list.length) {
+    img.src = list.shift();
+    img.dataset.fallbacks = list.join('|');
+  } else {
+    img.style.display = 'none';
+  }
 }
 
 function renderProfile(p) {
   const cached = clientConnected ? '' : ' <span class="pill ghost" style="font-size:0.65rem">última sesión</span>';
   const rank = p.soloQueue || p.flexQueue || null;
-  const emblemUrl = rank ? rankEmblemUrl(rank.tier) : rankEmblemUrl('Unranked');
-  const emblemImg = emblemUrl
-    ? `<img src="${esc(emblemUrl)}" alt="${esc(rank?.tier || 'Unranked')}" loading="lazy" onerror="this.style.display='none'" />`
-    : `<div class="rank-emblem-placeholder"></div>`;
+  const emblemImg = rank ? rankEmblemImg(rank.tier) : `<div class="rank-emblem-placeholder"></div>`;
 
   let rankBlock;
   if (rank) {
@@ -218,8 +243,7 @@ function renderProfile(p) {
   let peakBlock = '';
   if (p.peakRank && p.peakRank.tier) {
     const pk = p.peakRank;
-    const peakUrl = rankEmblemUrl(pk.tier);
-    const peakImg = peakUrl ? `<img class="peak-emblem" src="${esc(peakUrl)}" alt="" loading="lazy" onerror="this.style.display='none'"/>` : '';
+    const peakImg = rankEmblemImg(pk.tier, 'peak-emblem');
     peakBlock = `
       <div class="divider"></div>
       <div class="peak-row">
