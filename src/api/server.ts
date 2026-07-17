@@ -154,22 +154,34 @@ export function createServer(deps: ServerDeps = {}): Express {
    * Devuelve los casos de uso de perfil/partidas enrutados a la plataforma pedida.
    * Si no se especifica plataforma (o no hay Riot API), usa los de por defecto.
    */
+  // Casos de uso por plataforma, memorizados: así el cliente enrutado (y sus
+  // cachés de cuenta y de partidas) persiste entre peticiones en vez de crearse
+  // de cero cada vez (clave cuando el usuario siempre envía platform=la2).
+  const routedCache = new Map<
+    string,
+    { profile: typeof getPlayerProfile; matches: typeof getRecentMatches; stats: typeof getPlayerStats }
+  >();
   function routedRiot(platform: string | undefined): {
     profile: typeof getPlayerProfile;
     matches: typeof getRecentMatches;
     stats: typeof getPlayerStats;
   } {
-    if (!riotClient || !platform || platform === riotClient.platform) {
+    if (!riotClient || !platform || platform.toLowerCase() === riotClient.platform) {
       return { profile: getPlayerProfile, matches: getRecentMatches, stats: getPlayerStats };
     }
-    const region = PLATFORM_TO_REGION[platform.toLowerCase()] ?? riotClient.region;
-    const client = riotClient.withRouting(platform.toLowerCase(), region);
+    const key = platform.toLowerCase();
+    const hit = routedCache.get(key);
+    if (hit) return hit;
+    const region = PLATFORM_TO_REGION[key] ?? riotClient.region;
+    const client = riotClient.withRouting(key, region);
     const matches = new GetRecentMatchesUseCase(client);
-    return {
+    const bundle = {
       profile: new GetPlayerProfileUseCase(client),
       matches,
       stats: new GetPlayerStatsUseCase(matches),
     };
+    routedCache.set(key, bundle);
+    return bundle;
   }
 
   const identityStore = deps.identityStore ?? new MemoryIdentityStore();

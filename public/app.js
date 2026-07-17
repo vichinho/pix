@@ -426,8 +426,9 @@ async function refreshRiotPanels() {
     if (prof.data.gameName && prof.data.tagLine) setLinkedRiotId(prof.data.gameName, prof.data.tagLine);
     $('profileBody').innerHTML = renderProfile(prof.data) + renderRelinkLink();
     wireLinkForm();
-    refreshStats();
-    refreshMatches();
+    // Cargamos el historial (progresivo) y calculamos las estadísticas del mismo
+    // set de partidas (antes se pedían aparte, duplicando decenas de peticiones).
+    await refreshMatches();
   } else if (prof.status === 400 && prof.data?.error === 'identity_unavailable') {
     $('profileBody').innerHTML = renderLinkForm();
     wireLinkForm();
@@ -449,19 +450,42 @@ async function refreshRiotPanels() {
   }
 }
 
-async function refreshStats() {
-  const { ok, data, status } = await api(`/api/player/stats?count=20${riotIdQuery()}`);
-  if (!ok) { $('statsBody').innerHTML = `<span class="err">${esc(data?.error || status)}</span>`; return; }
-  const wr = Math.round((data.winRate || 0) * 100);
-  const top = (data.byChampion || []).slice(0, 6);
-  const rows = top.map((c) => `<tr>
-    <td>${champChip(c.championId, 18)}</td>
-    <td>${c.games}</td>
-    <td class="${c.winRate >= 0.5 ? 'win' : 'loss'}">${Math.round(c.winRate * 100)}%</td>
-    <td>${c.kda}</td>
-  </tr>`).join('');
-  $('statsBody').innerHTML = `
-    <div class="summary"><span class="big ${wr >= 50 ? 'win' : 'loss'}">${wr}%</span><span>WR · ${data.wins}V ${data.losses}D · ${data.totalGames} partidas</span></div>
+/**
+ * Calcula el rendimiento (WR global y por campeón) a partir del historial ya
+ * cargado en matchState.all — sin peticiones adicionales a la Riot API.
+ */
+function renderStatsFromMatches() {
+  const el = $('statsBody');
+  const matches = matchState.all;
+  if (!matches.length) { el.innerHTML = '<span class="muted">—</span>'; return; }
+
+  const total = matches.length;
+  const wins = matches.filter((m) => m.win).length;
+  const losses = total - wins;
+  const wr = Math.round((wins / total) * 100);
+
+  const by = new Map();
+  for (const m of matches) {
+    let e = by.get(m.championId);
+    if (!e) { e = { championId: m.championId, games: 0, wins: 0, k: 0, d: 0, a: 0 }; by.set(m.championId, e); }
+    e.games += 1; if (m.win) e.wins += 1;
+    e.k += m.kills; e.d += m.deaths; e.a += m.assists;
+  }
+  const top = [...by.values()].sort((x, y) => y.games - x.games).slice(0, 6);
+
+  const rows = top.map((c) => {
+    const cwr = c.wins / c.games;
+    const kda = (c.d === 0 ? c.k + c.a : (c.k + c.a) / c.d).toFixed(2);
+    return `<tr>
+      <td>${champChip(c.championId, 18)}</td>
+      <td>${c.games}</td>
+      <td class="${cwr >= 0.5 ? 'win' : 'loss'}">${Math.round(cwr * 100)}%</td>
+      <td>${kda}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="summary"><span class="big ${wr >= 50 ? 'win' : 'loss'}">${wr}%</span><span>WR · ${wins}V ${losses}D · ${total} partidas</span></div>
     <table><thead><tr><th>Campeón</th><th>P</th><th>WR</th><th>KDA</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -639,15 +663,25 @@ async function refreshMatches() {
   body.innerHTML = '<span class="muted">Cargando partidas…</span>';
   $('matchPagination').hidden = true;
 
-  const { ok, data, status } = await api(`/api/player/matches?count=50${riotIdQuery()}`);
-  if (!ok) {
-    body.innerHTML = `<span class="err">${esc(data?.error || status)}</span>`;
+  // Tanda rápida: primeras 12 partidas para pintar el historial cuanto antes.
+  const first = await api(`/api/player/matches?count=12${riotIdQuery()}`);
+  if (!first.ok) {
+    body.innerHTML = `<span class="err">${esc(first.data?.error || first.status)}</span>`;
     return;
   }
-
-  matchState.all  = data.matches || [];
+  matchState.all  = first.data.matches || [];
   matchState.page = 0;
   renderMatchPage();
+  renderStatsFromMatches();
+
+  // Tanda completa en segundo plano (el backend cachea, así que sólo trae las
+  // partidas nuevas). Al terminar, refresca historial y estadísticas.
+  const full = await api(`/api/player/matches?count=50${riotIdQuery()}`);
+  if (full.ok && Array.isArray(full.data?.matches) && full.data.matches.length > matchState.all.length) {
+    matchState.all = full.data.matches;
+    renderMatchPage();
+    renderStatsFromMatches();
+  }
 }
 
 // Listeners de paginación

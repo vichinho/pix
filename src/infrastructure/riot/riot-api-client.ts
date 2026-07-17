@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Role } from '../../domain/types.js';
 
 /** Error de la Riot API que preserva el status HTTP. */
@@ -112,6 +114,8 @@ export interface RiotApiClientOptions {
   maxRetries?: number;
   matchConcurrency?: number;
   sleepImpl?: (ms: number) => Promise<void>;
+  /** Carpeta para cachear partidas en disco (inmutables). Acelera reinicios. */
+  matchCacheDir?: string;
 }
 
 export class RiotApiClient {
@@ -123,6 +127,8 @@ export class RiotApiClient {
   private readonly matchConcurrency: number;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly matchCache = new Map<string, RiotMatchDto>();
+  private readonly accountCache = new Map<string, RiotAccountDto>();
+  private readonly matchCacheDir: string | undefined;
 
   constructor(opts: RiotApiClientOptions) {
     this.apiKey = opts.apiKey;
@@ -130,8 +136,35 @@ export class RiotApiClient {
     this.region = opts.region;
     this.fetchImpl = opts.fetchImpl ?? (globalThis.fetch as unknown as FetchLike);
     this.maxRetries = opts.maxRetries ?? 3;
-    this.matchConcurrency = Math.max(1, opts.matchConcurrency ?? 5);
+    // Concurrencia alta pero segura para la clave de desarrollo (límite 20 req/s).
+    this.matchConcurrency = Math.max(1, opts.matchConcurrency ?? 8);
     this.sleep = opts.sleepImpl ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.matchCacheDir = opts.matchCacheDir;
+    if (this.matchCacheDir) {
+      try { mkdirSync(this.matchCacheDir, { recursive: true }); } catch { /* best-effort */ }
+    }
+  }
+
+  /** Lee una partida cacheada en disco, si existe. Best-effort. */
+  private readDiskMatch(matchId: string): RiotMatchDto | null {
+    if (!this.matchCacheDir) return null;
+    try {
+      const file = join(this.matchCacheDir, `${matchId}.json`);
+      if (!existsSync(file)) return null;
+      return JSON.parse(readFileSync(file, 'utf8')) as RiotMatchDto;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Guarda una partida en disco (inmutable). Best-effort. */
+  private writeDiskMatch(matchId: string, match: RiotMatchDto): void {
+    if (!this.matchCacheDir) return;
+    try {
+      writeFileSync(join(this.matchCacheDir, `${matchId}.json`), JSON.stringify(match));
+    } catch {
+      /* best-effort */
+    }
   }
 
   /**
@@ -148,6 +181,7 @@ export class RiotApiClient {
       maxRetries: this.maxRetries,
       matchConcurrency: this.matchConcurrency,
       sleepImpl: this.sleep,
+      ...(this.matchCacheDir ? { matchCacheDir: this.matchCacheDir } : {}),
     });
   }
 
@@ -170,9 +204,16 @@ export class RiotApiClient {
   private platformHost(): string { return `${this.platform}.api.riotgames.com`; }
   private regionHost():   string { return `${this.region}.api.riotgames.com`; }
 
-  getAccountByRiotId(gameName: string, tagLine: string): Promise<RiotAccountDto> {
+  async getAccountByRiotId(gameName: string, tagLine: string): Promise<RiotAccountDto> {
+    // El puuid de un Riot ID no cambia: lo memorizamos para no repetir account-v1
+    // en cada endpoint (perfil, stats, historial) y reducir latencia y rate limit.
+    const key = `${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+    const cached = this.accountCache.get(key);
+    if (cached) return cached;
     const path = `/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
-    return this.request<RiotAccountDto>(this.regionHost(), path);
+    const account = await this.request<RiotAccountDto>(this.regionHost(), path);
+    this.accountCache.set(key, account);
+    return account;
   }
 
   getSummonerByPuuid(puuid: string): Promise<RiotSummonerDto> {
@@ -207,9 +248,15 @@ export class RiotApiClient {
   async getMatch(matchId: string): Promise<RiotMatchDto> {
     const cached = this.matchCache.get(matchId);
     if (cached) return cached;
+    const disk = this.readDiskMatch(matchId);
+    if (disk) {
+      this.matchCache.set(matchId, disk);
+      return disk;
+    }
     const path = `/lol/match/v5/matches/${encodeURIComponent(matchId)}`;
     const match = await this.request<RiotMatchDto>(this.regionHost(), path);
     this.matchCache.set(matchId, match);
+    this.writeDiskMatch(matchId, match);
     return match;
   }
 

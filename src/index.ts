@@ -40,6 +40,7 @@ function main(): void {
         apiKey: config.riotApiKey,
         platform: config.riotPlatform,
         region: config.riotRegion,
+        matchCacheDir: join(process.cwd(), 'data', 'match-cache'),
       })
     : null;
 
