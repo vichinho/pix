@@ -782,11 +782,68 @@ async function refreshContext(clientState) {
   // En partida (detectado por Live Client API o por el estado del LCU).
   // En ARAM la banca sólo existe en la fase previa (champ-select); una vez
   // dentro de la partida mostramos el coach en vivo con el campeón real.
-  if (liveActive || clientState === 'IN_GAME') return refreshInGame(live);
-  if (isAram)                       return refreshAram();
-  if (clientState === 'CHAMP_SELECT') return refreshChampSelect();
-  $('contextTitle').textContent = 'Contexto';
-  $('contextBody').innerHTML = '<span class="muted">Sin champ select activo. Entra a una partida para ver recomendaciones o análisis de ARAM.</span>';
+  if (liveActive || clientState === 'IN_GAME') { contextMode = 'ingame'; return refreshInGame(live); }
+  if (isAram)                       { contextMode = 'aram'; return refreshAram(); }
+  if (clientState === 'CHAMP_SELECT') { contextMode = 'champselect'; return refreshChampSelect(); }
+  // Inactivo: mostramos el explorador de builds. Se renderiza UNA vez (sticky)
+  // para no borrar la búsqueda o la build abierta en cada tick de 4s.
+  if (contextMode !== 'idle') { contextMode = 'idle'; renderIdleContext(); }
+}
+
+/** Modo actual del panel de contexto, para no re-renderizar el explorador. */
+let contextMode = null;
+
+/** Panel inactivo: explorador de builds de cualquier campeón. */
+function renderIdleContext() {
+  $('contextTitle').textContent = 'Explorar builds';
+  const champs = [...catalogById.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (!champs.length) {
+    $('contextBody').innerHTML = '<span class="muted">Cargando campeones…</span>';
+    contextMode = null; // reintenta en el próximo tick cuando cargue el catálogo
+    return;
+  }
+  const tiles = champs.map((c) => {
+    const url = iconBase ? `${iconBase}${esc(c.image)}` : '';
+    const img = url ? `<img src="${url}" alt="${esc(c.name)}" loading="lazy"/>` : '';
+    return `<button class="champ-tile" data-cid="${esc(c.id)}" title="${esc(c.name)}" data-name="${esc(c.name.toLowerCase())}">${img}<span>${esc(c.name)}</span></button>`;
+  }).join('');
+  $('contextBody').innerHTML = `
+    <div class="muted" style="margin-bottom:.6rem">No estás en partida. Busca cualquier campeón para ver su build, runas y orden de subida:</div>
+    <input id="champSearch" class="champ-search" type="text" placeholder="Buscar campeón…" autocomplete="off" spellcheck="false"/>
+    <div id="champGrid" class="champ-grid">${tiles}</div>
+    <div id="champBuildView" class="champ-build-view"></div>`;
+
+  const search = $('champSearch');
+  const grid = $('champGrid');
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase();
+    for (const t of grid.querySelectorAll('.champ-tile')) {
+      t.style.display = t.dataset.name.includes(q) ? '' : 'none';
+    }
+  });
+  grid.addEventListener('click', (e) => {
+    const tile = e.target.closest('.champ-tile');
+    if (tile) showIdleBuild(Number(tile.dataset.cid));
+  });
+}
+
+/** Muestra la build del campeón elegido en el explorador, con botón de volver. */
+async function showIdleBuild(championId) {
+  const grid = $('champGrid');
+  const search = $('champSearch');
+  const view = $('champBuildView');
+  if (!view) return;
+  view.innerHTML = '<span class="muted">Cargando build…</span>';
+  if (grid) grid.style.display = 'none';
+  if (search) search.style.display = 'none';
+  const b = await api(`/api/builds?championId=${championId}&role=UNKNOWN`);
+  const back = '<button class="linklike" id="champBack">← volver a la lista</button>';
+  view.innerHTML = back + (b.ok ? renderBuild(b.data) : '<span class="muted">Sin build para este campeón.</span>');
+  $('champBack').addEventListener('click', () => {
+    view.innerHTML = '';
+    if (grid) grid.style.display = '';
+    if (search) { search.style.display = ''; search.focus(); }
+  });
 }
 
 function renderRunesSummoners(b) {

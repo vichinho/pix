@@ -992,3 +992,31 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 .so-note { color: var(--faint); font-size: 0.68rem; }
 /* Los elementos con tooltip muestran cursor de ayuda */
 .iicon, .sicon, .rune, .abil, .tagfallback { cursor: help; }
+
+/* ══════════════════════════════════════
+   EXPLORADOR DE BUILDS (contexto inactivo)
+══════════════════════════════════════ */
+.champ-search {
+  width: 100%; background: var(--panel-3); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); padding: 0.55rem 0.75rem; color: var(--text);
+  font-size: 0.85rem; font-family: inherit; outline: none; margin-bottom: 0.75rem;
+}
+.champ-search:focus { border-color: var(--accent); }
+.champ-search::placeholder { color: var(--faint); }
+.champ-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 0.5rem; max-height: 420px; overflow-y: auto; padding: 0.15rem;
+}
+.champ-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+  background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-xs);
+  padding: 0.4rem 0.2rem; cursor: pointer; font-family: inherit; transition: border-color var(--transition), transform var(--transition);
+}
+.champ-tile:hover { border-color: var(--accent); transform: translateY(-1px); }
+.champ-tile img { width: 40px; height: 40px; border-radius: 6px; }
+.champ-tile span {
+  font-size: 0.6rem; color: var(--muted); text-align: center; line-height: 1.1;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.champ-build-view { margin-top: 0.4rem; }
+.champ-build-view #champBack { margin-bottom: 0.7rem; display: inline-block; }
