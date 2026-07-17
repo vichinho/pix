@@ -77,6 +77,7 @@ export const ITEM = {
   SUNDERED_SKY: 6610,
   STERAKS_GAGE: 3053,
   BLACK_CLEAVER: 3071,
+  BLADE_OF_THE_RUINED_KING: 3153,
   // Enchantador extra
   ECHOES_OF_HELIA: 6620,
 } as const;
