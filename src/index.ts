@@ -4,7 +4,6 @@ import { createServer } from './api/server.js';
 import { RiotApiClient } from './infrastructure/riot/riot-api-client.js';
 import { FileIdentityStore } from './infrastructure/persistence/identity-store.js';
 import { ChampionCatalog } from './infrastructure/champions/champion-catalog.js';
-import { UggBuildProvider } from './infrastructure/champions/ugg-build-provider.js';
 
 /** Carga variables desde .env si existe (Node 20.12+/22). */
 function loadDotEnv(): void {
@@ -47,14 +46,7 @@ function main(): void {
 
   const identityStore = new FileIdentityStore(join(process.cwd(), 'data', 'last-identity.json'));
   const championCatalog = new ChampionCatalog({ locale: config.ddragonLocale });
-  const uggProvider =
-    config.uggBuilds === 'on'
-      ? new UggBuildProvider({
-          ...(config.uggPatch ? { patch: config.uggPatch } : {}),
-          ...(config.uggOverviewVersion ? { overviewVersion: config.uggOverviewVersion } : {}),
-        })
-      : null;
-  const app = createServer({ riotClient, identityStore, championCatalog, uggProvider });
+  const app = createServer({ riotClient, identityStore, championCatalog });
 
   app.listen(config.port, '127.0.0.1', () => {
     // eslint-disable-next-line no-console
