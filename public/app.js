@@ -59,6 +59,12 @@ function riotIdQuery() {
   return `&${parts.join('&')}`;
 }
 
+/** Etiqueta corta del servidor a partir de la plataforma (la2 → "LAS"). */
+function platformShort(platform) {
+  const p = RIOT_PLATFORMS.find((x) => x.v === platform);
+  return p ? p.label.split(' · ')[0] : (platform || '').toUpperCase();
+}
+
 /** Servidores de LoL: valor = plataforma Riot (para summoner-v4/league-v4). */
 const RIOT_PLATFORMS = [
   { v: 'la2', label: 'LAS · Latinoamérica Sur' },
@@ -240,7 +246,7 @@ function renderProfile(p) {
         <div class="profile-info">
           <div class="profile-name">${esc(p.gameName)}<span class="profile-tag">#${esc(p.tagLine)}</span>${cached}</div>
           <div class="profile-meta">
-            <span class="profile-region">${esc(p.region.toUpperCase())}</span>
+            <span class="profile-region">${esc(platformShort(getLinkedPlatform()) || p.region.toUpperCase())}</span>
           </div>
         </div>
       </div>

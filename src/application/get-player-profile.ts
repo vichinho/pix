@@ -66,19 +66,28 @@ export class GetPlayerProfileUseCase {
       if (!(err instanceof RiotApiError) || err.status !== 404) throw err;
     }
 
-    // Datos clasificatorios (best-effort: si falla devolvemos nulls)
+    // Datos clasificatorios (best-effort: si falla devolvemos nulls).
+    // Preferimos league-v4 by-puuid (no depende del summonerId encriptado que
+    // Riot está deprecando); si no está disponible, caemos a by-summoner.
     let soloQueue: RankedEntry | null = null;
     let flexQueue: RankedEntry | null = null;
 
-    if (summonerId) {
-      try {
-        const entries = await this.riot.getLeagueEntries(summonerId);
-        for (const e of entries) {
-          if (e.queueType === 'RANKED_SOLO_5x5') soloQueue = dtoToEntry(e);
-          if (e.queueType === 'RANKED_FLEX_SR')  flexQueue = dtoToEntry(e);
+    let entries: RiotLeagueEntryDto[] | null = null;
+    try {
+      entries = await this.riot.getLeagueEntriesByPuuid(account.puuid);
+    } catch {
+      if (summonerId) {
+        try {
+          entries = await this.riot.getLeagueEntries(summonerId);
+        } catch {
+          // No rompemos el perfil si league-v4 falla por ambas vías.
         }
-      } catch {
-        // No rompemos el perfil si league-v4 falla
+      }
+    }
+    if (Array.isArray(entries)) {
+      for (const e of entries) {
+        if (e.queueType === 'RANKED_SOLO_5x5') soloQueue = dtoToEntry(e);
+        if (e.queueType === 'RANKED_FLEX_SR')  flexQueue = dtoToEntry(e);
       }
     }
 

@@ -170,6 +170,23 @@ describe('GetPlayerProfileUseCase', () => {
     });
   });
 
+  it('obtiene el rango vía league-v4 by-puuid', async () => {
+    const c = client(
+      fakeFetch({
+        'by-riot-id': { body: { puuid: 'PUUID', gameName: 'Player', tagLine: 'LAS' } },
+        'summoner/v4/summoners/by-puuid': { body: { puuid: 'PUUID', id: 'SID', summonerLevel: 803, profileIconId: 29 } },
+        'league/v4/entries/by-puuid': {
+          body: [
+            { queueType: 'RANKED_SOLO_5x5', tier: 'GOLD', rank: 'II', leaguePoints: 45, wins: 60, losses: 50 },
+          ],
+        },
+      }),
+    );
+    const profile = await new GetPlayerProfileUseCase(c).execute({ gameName: 'Player', tagLine: 'LAS' });
+    expect(profile.soloQueue).toMatchObject({ tier: 'GOLD', division: 'II', leaguePoints: 45 });
+    expect(profile.summonerLevel).toBe(803);
+  });
+
   it('tolera summoner-v4 404 devolviendo nivel/ícono null', async () => {
     const c = client(
       fakeFetch({

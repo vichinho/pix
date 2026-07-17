@@ -190,6 +190,15 @@ export class RiotApiClient {
     return this.request<RiotLeagueEntryDto[]>(this.platformHost(), path);
   }
 
+  /**
+   * league-v4 por PUUID: alternativa moderna que no depende del summonerId
+   * encriptado (que Riot está deprecando). Preferida para obtener el rango.
+   */
+  getLeagueEntriesByPuuid(puuid: string): Promise<RiotLeagueEntryDto[]> {
+    const path = `/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`;
+    return this.request<RiotLeagueEntryDto[]>(this.platformHost(), path);
+  }
+
   getMatchIdsByPuuid(puuid: string, count: number): Promise<string[]> {
     const path = `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?start=0&count=${count}`;
     return this.request<string[]>(this.regionHost(), path);
