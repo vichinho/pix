@@ -13,6 +13,7 @@ import { GetPersonalizedRecommendationsUseCase } from '../application/get-person
 import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
 import { enrichBuild, bareEnrichedBuild } from '../application/enrich-build.js';
 import { GetLiveChampionUseCase } from '../application/get-live-champion.js';
+import { GetLiveGameStateUseCase } from '../application/get-live-game-state.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
 import {
@@ -125,6 +126,7 @@ export function createServer(deps: ServerDeps = {}): Express {
     ]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
   const getLiveChampion = new GetLiveChampionUseCase(liveGameReader, championCatalog);
+  const getLiveGameState = new GetLiveGameStateUseCase(liveGameReader);
   const riotClient = deps.riotClient ?? null;
   const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
   const getRecentMatches = riotClient ? new GetRecentMatchesUseCase(riotClient) : null;
@@ -227,6 +229,18 @@ export function createServer(deps: ServerDeps = {}): Express {
       res.status(500).json({ error: 'live_champion_failed', message: String(err) });
     }
   });
+
+  app.get(
+    '/api/live/game',
+    wrap(async (_req: Request, res: Response) => {
+      const state = await getLiveGameState.execute();
+      if (!state) {
+        res.json({ active: false });
+        return;
+      }
+      res.json({ active: true, ...state });
+    }),
+  );
 
   app.get('/api/champ-select/session', async (_req: Request, res: Response) => {
     try {

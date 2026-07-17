@@ -1,5 +1,6 @@
 import type { Role } from '../../domain/types.js';
 import { mapTeamPosition } from '../riot/riot-api-client.js';
+import { computeObjectives, type Objectives, type LiveEvent } from '../../domain/live-objectives.js';
 import { LiveClient, type LiveClientConnector } from './live-client.js';
 
 interface LivePlayerDto {
@@ -63,4 +64,43 @@ export class LiveGameReader {
       return null;
     }
   }
+
+  /**
+   * Estado de la partida en curso: tiempo, objetivos épicos y datos del jugador.
+   * Devuelve null si no hay partida activa.
+   */
+  async getGameState(): Promise<LiveGameState | null> {
+    const connector = this.connectorFactory();
+    try {
+      const data = await connector.request<AllGameDataDto>('/liveclientdata/allgamedata');
+      const gameTime = Math.max(0, Math.floor(data.gameData?.gameTime ?? 0));
+      const events = (data.events?.Events ?? []).map(
+        (e): LiveEvent => ({ EventName: e.EventName, EventTime: e.EventTime }),
+      );
+      return {
+        gameTime,
+        objectives: computeObjectives(gameTime, events),
+        player: {
+          level: data.activePlayer?.level ?? 0,
+          currentGold: Math.floor(data.activePlayer?.currentGold ?? 0),
+        },
+      };
+    } catch {
+      return null;
+    }
+  }
+}
+
+/** Estructura parcial de /liveclientdata/allgamedata. */
+interface AllGameDataDto {
+  activePlayer?: { level?: number; currentGold?: number };
+  events?: { Events?: Array<{ EventName: string; EventTime: number }> };
+  gameData?: { gameTime?: number };
+}
+
+/** Estado de la partida en curso. */
+export interface LiveGameState {
+  gameTime: number;
+  objectives: Objectives;
+  player: { level: number; currentGold: number };
 }

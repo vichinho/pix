@@ -557,8 +557,60 @@ async function refreshInGame() {
   }
   const b = await api(`/api/builds?championId=${championId}&role=${role || 'UNKNOWN'}`);
   const head = `<div class="pickhead" style="margin-bottom:.6rem">${champChip(championId, 36)}</div>`;
-  if (!b.ok) { $('contextBody').innerHTML = `${head}<span class="muted">Sin build para este campeón todavía.</span>`; return; }
-  $('contextBody').innerHTML = head + renderBuild(b.data);
+
+  // Coach en vivo: objetivos épicos, timers y power-spike (Live Client API).
+  const game = await api('/api/live/game');
+  const coachHtml = game.ok && game.data?.active ? renderLiveCoach(game.data) : '';
+
+  const buildHtml = b.ok ? renderBuild(b.data) : '<span class="muted">Sin build para este campeón todavía.</span>';
+  $('contextBody').innerHTML = head + coachHtml + buildHtml;
+}
+
+/** Formatea segundos como "m:ss". */
+function fmtCountdown(sec) {
+  if (sec == null) return '';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function objectiveCell(label, icon, o) {
+  let statusHtml;
+  if (o.status === 'up') statusHtml = '<span class="obj-up">Disponible</span>';
+  else if (o.status === 'respawning') statusHtml = `<span class="obj-timer">${fmtCountdown(o.secondsUntil)}</span>`;
+  else if (o.status === 'not_yet') statusHtml = `<span class="obj-soon">en ${fmtCountdown(o.secondsUntil)}</span>`;
+  else statusHtml = '<span class="obj-gone">—</span>';
+  const taken = o.taken > 0 ? `<span class="obj-count">${o.taken}</span>` : '';
+  return `<div class="obj-cell">
+    <div class="obj-head">${icon} ${esc(label)} ${taken}</div>
+    ${statusHtml}
+  </div>`;
+}
+
+/** Panel de coach en vivo: tiempo, objetivos y consejo de power-spike. */
+function renderLiveCoach(g) {
+  const o = g.objectives;
+  const gold = g.player.currentGold;
+  const spike =
+    gold >= 3000 ? '💰 Tienes oro para un ítem grande — considera volver a la base.'
+    : gold >= 1300 ? '💰 Oro suficiente para un componente clave — planea tu recall.'
+    : null;
+  const advice = [];
+  if (o.dragon.status === 'up') advice.push('🐉 Dragón disponible — coordina con tu equipo.');
+  if (o.baron.status === 'up') advice.push('🦑 Barón disponible — asegúralo con visión.');
+  if (o.herald.status === 'up') advice.push('👁️ Heraldo disponible — buen momento para presionar una calle.');
+  if (spike) advice.push(spike);
+
+  return `<div class="block coach">
+    <div class="label">Coach en vivo · ${fmtCountdown(g.gameTime)}</div>
+    <div class="objectives">
+      ${objectiveCell('Dragón', '🐉', o.dragon)}
+      ${objectiveCell('Heraldo', '👁️', o.herald)}
+      ${objectiveCell('Barón', '🦑', o.baron)}
+    </div>
+    <div class="coach-player">Nivel ${esc(g.player.level)} · ${esc(gold)} oro</div>
+    ${advice.length ? `<ul class="coach-advice">${advice.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+  </div>`;
 }
 
 function renderRecommendations(target, data) {

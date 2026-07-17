@@ -911,3 +911,22 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 .ds-val { display: block; font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ds-label { display: block; font-size: 0.62rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.1rem; }
 .detail-foot { margin-top: 0.6rem; font-size: 0.68rem; color: var(--faint); text-align: center; }
+
+/* ══════════════════════════════════════
+   COACH EN VIVO
+══════════════════════════════════════ */
+.coach { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 0.85rem 0.9rem; }
+.objectives { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+.obj-cell {
+  background: var(--panel-3); border-radius: var(--radius-xs); padding: 0.55rem 0.4rem;
+  text-align: center; display: flex; flex-direction: column; gap: 0.25rem;
+}
+.obj-head { font-size: 0.74rem; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 0.25rem; }
+.obj-count { background: var(--accent-soft); color: var(--accent); border-radius: 99px; font-size: 0.6rem; padding: 0.02rem 0.35rem; font-weight: 600; }
+.obj-up { color: var(--win); font-weight: 600; font-size: 0.82rem; }
+.obj-timer { color: var(--accent); font-weight: 600; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.obj-soon { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.obj-gone { color: var(--faint); }
+.coach-player { margin-top: 0.6rem; font-size: 0.78rem; color: var(--muted); text-align: center; }
+.coach-advice { list-style: none; margin: 0.55rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.coach-advice li { font-size: 0.8rem; color: var(--text); background: var(--panel-3); border-radius: var(--radius-xs); padding: 0.4rem 0.55rem; border-left: 2px solid var(--accent); }
