@@ -15,14 +15,25 @@ type BuildArchetype =
   | 'FIGHTER'
   | 'ENCHANTER';
 
-/** Deriva el arquetipo de build a partir de tags (Data Dragon) y tipo de daño. */
+/**
+ * Deriva el arquetipo de build a partir de tags (Data Dragon) y tipo de daño.
+ *
+ * Data Dragon lista los tags con el principal primero. Eso importa para
+ * distinguir enchantadores de magos con toque de soporte: los enchantadores
+ * reales (Soraka, Sona, Lulu, Nami…) tienen 'Support' como tag PRINCIPAL,
+ * mientras que magos de ráfaga con 'Support' secundario (Annie, Brand, Morgana,
+ * Lux, Zyra…) deben construir como magos AP, no como enchantadores.
+ */
 export function resolveArchetype(tags: string[], damage: DamageType): BuildArchetype {
+  const primary = tags[0];
   if (tags.includes('Marksman')) return 'MARKSMAN';
   if (tags.includes('Assassin')) return damage === 'AP' ? 'ASSASSIN_AP' : 'ASSASSIN_AD';
+  if (primary === 'Tank') return 'TANK';
+  if (primary === 'Support') return 'ENCHANTER';
+  if (tags.includes('Mage')) return 'MAGE';
   if (tags.includes('Tank')) return 'TANK';
   if (tags.includes('Support')) return 'ENCHANTER';
   if (tags.includes('Fighter')) return 'FIGHTER';
-  if (tags.includes('Mage')) return 'MAGE';
   if (damage === 'AD') return 'FIGHTER';
   return 'MAGE';
 }

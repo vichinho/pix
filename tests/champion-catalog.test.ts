@@ -117,6 +117,13 @@ describe('resolveArchetype', () => {
     expect(resolveArchetype(['Mage'], 'AP')).toBe('MAGE');
     expect(resolveArchetype(['Fighter'], 'AD')).toBe('FIGHTER');
   });
+  it('los magos con Support secundario construyen como magos, no enchantadores', () => {
+    // Annie, Brand, Morgana, Lux… tienen 'Mage' como tag principal y 'Support'
+    // secundario: deben ir build AP mago (ráfaga), no build de enchantador.
+    expect(resolveArchetype(['Mage', 'Support'], 'AP')).toBe('MAGE');
+    // Los enchantadores reales tienen 'Support' como tag principal.
+    expect(resolveArchetype(['Support', 'Mage'], 'AP')).toBe('ENCHANTER');
+  });
   it('cae al tipo de daño sin tags', () => {
     expect(resolveArchetype([], 'AP')).toBe('MAGE');
     expect(resolveArchetype([], 'AD')).toBe('FIGHTER');
