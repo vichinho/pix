@@ -611,6 +611,22 @@ export function createServer(deps: ServerDeps = {}): Express {
     }),
   );
 
+  // Sonda de lolalytics (alternativa a u.gg): verifica accesibilidad y forma.
+  app.get(
+    '/api/builds/probe-lolalytics',
+    wrap(async (req: Request, res: Response) => {
+      const parsed = buildsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+        return;
+      }
+      const { LolalyticsClient } = await import(
+        '../infrastructure/champions/lolalytics-client.js'
+      );
+      res.json(await new LolalyticsClient().probe(parsed.data.championId));
+    }),
+  );
+
   // Rutas planificadas en la especificación, aún no implementadas.
   const notImplemented = (name: string) => (_req: Request, res: Response) => {
     res.status(501).json({ error: 'not_implemented', endpoint: name });
