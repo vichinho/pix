@@ -594,6 +594,23 @@ export function createServer(deps: ServerDeps = {}): Express {
     }),
   );
 
+  // Sonda de headers: misma URL con distintos perfiles, para aislar headers vs TLS.
+  app.get(
+    '/api/builds/probe-headers',
+    wrap(async (req: Request, res: Response) => {
+      if (!uggProvider) {
+        res.status(503).json({ error: 'ugg_disabled' });
+        return;
+      }
+      const parsed = buildsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+        return;
+      }
+      res.json(await uggProvider.probeHeaders(parsed.data.championId));
+    }),
+  );
+
   // Rutas planificadas en la especificación, aún no implementadas.
   const notImplemented = (name: string) => (_req: Request, res: Response) => {
     res.status(501).json({ error: 'not_implemented', endpoint: name });

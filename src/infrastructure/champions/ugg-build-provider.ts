@@ -113,11 +113,58 @@ export class UggBuildProvider implements BuildProvider {
   }
 
   /** GET con headers de navegador y timeout. */
-  private get(url: string): Promise<Response> {
+  private get(url: string, headers: Record<string, string> = BROWSER_HEADERS): Promise<Response> {
     return this.fetchImpl(url, {
-      headers: BROWSER_HEADERS,
+      headers,
       signal: AbortSignal.timeout(this.timeoutMs),
     });
+  }
+
+  /**
+   * Prueba la misma URL (SR, parche reciente publicado) con varios perfiles de
+   * headers para aislar si el bloqueo 403 es por headers o por huella TLS.
+   */
+  async probeHeaders(championId: number): Promise<{
+    url: string | null;
+    results: { profile: string; status: number | string }[];
+  }> {
+    const ver = await this.resolveVersion();
+    if (!ver) return { url: null, results: [] };
+    const primary = ver.version.split('.').slice(0, 2).join('.');
+    // Usamos minor-1 (el parche actual puede no estar publicado aún en u.gg).
+    const patch = recentPatches(ver.patch, 2)[1] ?? ver.patch;
+    const url = `https://stats2.u.gg/lol/${primary}/overview/${patch}/ranked_solo_5x5/${championId}/${ver.version}.json`;
+
+    const profiles: Record<string, Record<string, string>> = {
+      'navegación': {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+      },
+      'solo-ua': {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      },
+      'xhr-origin': BROWSER_HEADERS,
+      'sin-headers': {},
+    };
+
+    const results: { profile: string; status: number | string }[] = [];
+    for (const [profile, headers] of Object.entries(profiles)) {
+      try {
+        const res = await this.get(url, headers);
+        results.push({ profile, status: res.status });
+      } catch (err) {
+        results.push({ profile, status: String(err) });
+      }
+    }
+    return { url, results };
   }
 
   /** Descarga el JSON crudo del overview de u.gg (o null si falla). Público para diagnóstico. */
