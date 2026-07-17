@@ -9,7 +9,7 @@ import type { Role } from '../../domain/types.js';
  *
  * Los championId corresponden a los keys numéricos de Riot / Data Dragon.
  */
-const SEED: Record<Exclude<Role, 'UNKNOWN'>, ChampionCandidate[]> = {
+const SEED: Record<Exclude<Role, 'UNKNOWN' | 'ARAM'>, ChampionCandidate[]> = {
   TOP: [
     { championId: 86, championName: 'Garen', role: 'TOP', baseScore: 78 },
     { championId: 122, championName: 'Darius', role: 'TOP', baseScore: 80 },
@@ -56,7 +56,7 @@ const SEED: Record<Exclude<Role, 'UNKNOWN'>, ChampionCandidate[]> = {
 /** Implementación de ChampionPool basada en la seed estática. */
 export class SeedChampionPool implements ChampionPool {
   getCandidates(role: Role): ChampionCandidate[] {
-    if (role === 'UNKNOWN') return [];
+    if (role === 'UNKNOWN' || role === 'ARAM') return [];
     // Copia defensiva para que quien consuma no mute la seed.
     return SEED[role].map((c) => ({ ...c }));
   }

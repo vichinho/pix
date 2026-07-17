@@ -4,6 +4,11 @@ import type { Server } from 'node:http';
 import { createServer } from '@/api/server.js';
 import type { ClientDetector } from '@/infrastructure/lcu/client-detector.js';
 import { RiotApiClient, type FetchLike } from '@/infrastructure/riot/riot-api-client.js';
+import { ChampionCatalog } from '@/infrastructure/champions/champion-catalog.js';
+
+/** Catálogo con el CDN caído (getData/getMeta degradan a null). */
+const downCatalog = () =>
+  new ChampionCatalog({ fetchImpl: async () => ({ ok: false, status: 503, text: async () => '' }) });
 
 let server: Server | null = null;
 
@@ -30,6 +35,27 @@ const throwingDetector = {
 } as unknown as ClientDetector;
 
 const dummyFetch: FetchLike = async () => ({ status: 200, ok: true, text: async () => '{}' });
+
+describe('builds robustas', () => {
+  it('acepta role=UNKNOWN (ARAM) y devuelve una build con iconos', async () => {
+    const base = await listen(
+      createServer({ championCatalog: downCatalog(), staticDir: null }),
+    );
+    const res = await fetch(`${base}/api/builds?championId=202&role=UNKNOWN`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { championId: number; items: { core: unknown[] } };
+    expect(body.championId).toBe(202);
+    expect(body.items.core.length).toBeGreaterThan(0);
+  });
+
+  it('nunca devuelve 404: cualquier championId trae build', async () => {
+    const base = await listen(
+      createServer({ championCatalog: downCatalog(), staticDir: null }),
+    );
+    const res = await fetch(`${base}/api/builds?championId=99999&role=MIDDLE`);
+    expect(res.status).toBe(200);
+  });
+});
 
 describe('resiliencia del servidor', () => {
   it('un timeout del LCU no tumba el proceso: responde 400 identity_unavailable', async () => {

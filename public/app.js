@@ -501,7 +501,22 @@ async function refreshAram() {
     const o = data.bestOption;
     best = `${champChip(o.championId, 26)} <span class="score">${o.fitScore}</span> ${(o.fillsGaps || []).map((g) => `<span class="tag good">${esc(g)}</span>`).join('')}`;
   }
-  const options = (data.options || []).map((o) => `<li class="recitem"><span>${champChip(o.championId, 24)}</span><span class="score">${o.fitScore}</span></li>`).join('');
+  const options = (data.options || [])
+    .map((o) => `<li class="recitem"><span>${champChip(o.championId, 24)}</span><span class="score">${o.fitScore}</span></li>`)
+    .join('');
+
+  // Build del campeón que tienes actualmente (se actualiza al intercambiar en la banca).
+  const localChamp = (data.team || []).find((c) => c.isLocalPlayer);
+  let buildHtml = '';
+  if (localChamp) {
+    lastPickedChampionId = localChamp.championId;
+    lastPickedRole = 'UNKNOWN';
+    const b = await api(`/api/builds?championId=${localChamp.championId}&role=UNKNOWN`);
+    if (b.ok) {
+      buildHtml = `<div class="block"><div class="label">Tu build</div>${renderBuild(b.data)}</div>`;
+    }
+  }
+
   $('contextBody').innerHTML = `
     <div class="summary">${balanced}</div>
     <div class="kv">
@@ -512,7 +527,8 @@ async function refreshAram() {
     ${missing   ? `<div class="block"><div class="label">Le falta</div><div>${missing}</div></div>` : ''}
     ${strengths ? `<div class="block"><div class="label">Fortalezas</div><div>${strengths}</div></div>` : ''}
     <div class="block"><div class="label">Mejor elección de tu banca</div><div class="recitem">${best}</div></div>
-    ${options ? `<div class="block"><div class="label">Opciones (tú + banca)</div><ul class="reclist">${options}</ul></div>` : ''}`;
+    ${options ? `<div class="block"><div class="label">Opciones (tú + banca)</div><ul class="reclist">${options}</ul></div>` : ''}
+    ${buildHtml}`;
 }
 
 // --- Bucle --------------------------------------------------------------

@@ -7,6 +7,7 @@ import {
 import {
   ArchetypeBuildProvider,
   CatalogArchetypeBuildProvider,
+  resolveArchetype,
 } from '@/infrastructure/champions/archetype-build-provider.js';
 import { SeedChampionTraitProvider } from '@/infrastructure/champions/champion-traits.js';
 
@@ -103,6 +104,22 @@ describe('inferDamage', () => {
   it('desempata fighters/assassins por attack vs magic', () => {
     expect(inferDamage(['Fighter'], { attack: 8, magic: 2 })).toBe('AD');
     expect(inferDamage(['Assassin'], { attack: 2, magic: 8 })).toBe('AP');
+  });
+});
+
+describe('resolveArchetype', () => {
+  it('mapea la clase principal del campeón', () => {
+    expect(resolveArchetype(['Marksman'], 'AD')).toBe('MARKSMAN');
+    expect(resolveArchetype(['Support', 'Mage'], 'AP')).toBe('ENCHANTER');
+    expect(resolveArchetype(['Tank', 'Support'], 'NONE')).toBe('TANK');
+    expect(resolveArchetype(['Assassin'], 'AD')).toBe('ASSASSIN_AD');
+    expect(resolveArchetype(['Assassin'], 'AP')).toBe('ASSASSIN_AP');
+    expect(resolveArchetype(['Mage'], 'AP')).toBe('MAGE');
+    expect(resolveArchetype(['Fighter'], 'AD')).toBe('FIGHTER');
+  });
+  it('cae al tipo de daño sin tags', () => {
+    expect(resolveArchetype([], 'AP')).toBe('MAGE');
+    expect(resolveArchetype([], 'AD')).toBe('FIGHTER');
   });
 });
 

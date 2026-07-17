@@ -57,7 +57,7 @@ export interface ServerDeps {
 }
 
 const recommendationsQuerySchema = z.object({
-  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']).optional(),
+  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']).optional(),
   limit: z.coerce.number().int().min(1).max(10).optional(),
   personalized: z.enum(['true', 'false']).optional(),
   gameName: z.string().min(1).optional(),
@@ -66,7 +66,7 @@ const recommendationsQuerySchema = z.object({
 
 const buildsQuerySchema = z.object({
   championId: z.coerce.number().int().positive(),
-  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'ARAM']).optional(),
+  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']).optional(),
 });
 
 const identityQuerySchema = z.object({
@@ -119,8 +119,8 @@ export function createServer(deps: ServerDeps = {}): Express {
     deps.buildProvider ??
     new FallbackBuildProvider([
       new SeedBuildProvider(),
-      new ArchetypeBuildProvider(championTraits),
       new CatalogArchetypeBuildProvider(championCatalog),
+      new ArchetypeBuildProvider(championTraits),
       new DefaultBuildProvider(),
     ]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);

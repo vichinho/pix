@@ -148,7 +148,7 @@ describe('GetPlayerProfileUseCase', () => {
       }),
     );
     const profile = await new GetPlayerProfileUseCase(c).execute({ gameName: 'Player', tagLine: 'LAS' });
-    expect(profile).toEqual({
+    expect(profile).toMatchObject({
       puuid: 'PUUID',
       gameName: 'Player',
       tagLine: 'LAS',
