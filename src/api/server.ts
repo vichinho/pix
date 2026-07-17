@@ -16,6 +16,7 @@ import { GetLiveChampionUseCase } from '../application/get-live-champion.js';
 import { GetLiveGameStateUseCase } from '../application/get-live-game-state.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
+import { ClassifiedBuildProvider } from '../infrastructure/champions/champion-archetypes.js';
 import {
   ArchetypeBuildProvider,
   CatalogArchetypeBuildProvider,
@@ -138,11 +139,14 @@ export function createServer(deps: ServerDeps = {}): Express {
   const buildProvider =
     deps.buildProvider ??
     new FallbackBuildProvider([
-      // Builds curadas por campeón primero (meta específico); si no cubre un
-      // campeón, cae a una build por arquetipo de clase, siempre con algo válido.
+      // 1) Builds curadas específicas (máxima precisión).
       new SeedBuildProvider(),
+      // 2) Build por SUBCLASE clasificada a mano para CADA campeón (cobertura total).
+      new ClassifiedBuildProvider(championCatalog),
+      // 3) Respaldo por tags de Data Dragon y por rasgos de ARAM.
       new CatalogArchetypeBuildProvider(championCatalog),
       new ArchetypeBuildProvider(championTraits),
+      // 4) Último recurso: nunca deja a un campeón sin build.
       new DefaultBuildProvider(),
     ]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);

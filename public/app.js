@@ -733,7 +733,7 @@ function renderBuild(b) {
 
 /** Etiqueta de fuente + parche de la build. */
 function buildMeta(b) {
-  const src = { curated: 'curada', archetype: 'por clase', default: 'genérica' }[b.source] || b.source;
+  const src = { curated: 'curada', classified: 'por campeón', archetype: 'por clase', default: 'genérica' }[b.source] || b.source;
   const patch = /^\d+\.\d+/.test(b.patch || '') ? `Parche ${b.patch}` : esc(b.patch);
   return `Build ${esc(src)} · ${patch}`;
 }
