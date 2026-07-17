@@ -96,6 +96,10 @@ export async function enrichBuild(
   await catalog.ensureRunes();
   const spells = await catalog.getChampionSpells(build.championId);
 
+  // Parche actual del juego, leído en vivo de Data Dragon (p. ej. "16.14").
+  // Así la build siempre refleja el parche vigente sin etiquetas fijas.
+  const patch = data?.version ? data.version.split('.').slice(0, 2).join('.') : build.patch;
+
   const itemBase = data?.itemIconBase ?? null;
   const spellBase = data?.spellIconBase ?? null;
   const passiveBase = data?.passiveIconBase ?? null;
@@ -168,7 +172,7 @@ export async function enrichBuild(
     runes,
     skillOrder: build.skillOrder,
     source: build.source,
-    patch: build.patch,
+    patch,
     ...(build.notes ? { notes: build.notes } : {}),
     summoners,
     items: {

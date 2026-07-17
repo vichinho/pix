@@ -728,7 +728,14 @@ function renderBuild(b) {
     <div class="block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
     <div class="block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div></div>
     ${b.notes ? `<div class="note">💡 ${esc(b.notes)}</div>` : ''}
-    <div class="source-note">Fuente: ${esc(b.source)} · ${esc(b.patch)}</div>`;
+    <div class="source-note">${buildMeta(b)}</div>`;
+}
+
+/** Etiqueta de fuente + parche de la build. */
+function buildMeta(b) {
+  const src = { curated: 'curada', archetype: 'por clase', default: 'genérica' }[b.source] || b.source;
+  const patch = /^\d+\.\d+/.test(b.patch || '') ? `Parche ${b.patch}` : esc(b.patch);
+  return `Build ${esc(src)} · ${patch}`;
 }
 
 // --- Contexto -----------------------------------------------------------
