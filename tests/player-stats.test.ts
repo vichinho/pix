@@ -19,6 +19,13 @@ function match(over: Partial<MatchSummary>): MatchSummary {
     assists: 1,
     win: true,
     durationSec: 1200,
+    championLevel: 11,
+    items: [0,0,0,0,0,0,0],
+    summonerSpells: [4,7],
+    cs: 150,
+    gold: 10000,
+    damage: 15000,
+    visionScore: 20,
     playedAt: '2026-07-13T00:00:00.000Z',
     ...over,
   };

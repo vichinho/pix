@@ -22,6 +22,9 @@ const ROLE_ES = { TOP:'Top', JUNGLE:'Jungla', MIDDLE:'Mid', BOTTOM:'ADC', UTILIT
 // --- Catálogo -----------------------------------------------------------
 let catalogById = new Map();
 let iconBase = '';
+let itemIconBase = '';
+let spellIconBase = '';
+let profileIconBase = '';
 let lastPickedChampionId = null;
 let lastPickedRole = 'UNKNOWN';
 
@@ -29,8 +32,28 @@ async function loadCatalog() {
   const { ok, data } = await api('/api/champions');
   if (ok && data && Array.isArray(data.champions)) {
     iconBase = data.iconBase || '';
+    itemIconBase = data.itemIconBase || '';
+    spellIconBase = data.spellIconBase || '';
+    profileIconBase = data.profileIconBase || '';
     catalogById = new Map(data.champions.map((c) => [Number(c.id), c]));
   }
+}
+
+/** ID de hechizo de invocador → archivo de icono de Data Dragon. */
+const SUMMONER_SPELL_FILE = {
+  1: 'SummonerBoost', 3: 'SummonerExhaust', 4: 'SummonerFlash', 6: 'SummonerHaste',
+  7: 'SummonerHeal', 11: 'SummonerSmite', 12: 'SummonerTeleport', 13: 'SummonerMana',
+  14: 'SummonerDot', 21: 'SummonerBarrier', 32: 'SummonerSnowball', 39: 'SummonerSnowball',
+};
+function summonerSpellIconUrl(id) {
+  const f = SUMMONER_SPELL_FILE[Number(id)];
+  return f && spellIconBase ? `${spellIconBase}${f}.png` : null;
+}
+function itemIconUrl(id) {
+  return id && itemIconBase ? `${itemIconBase}${id}.png` : null;
+}
+function profileIconUrl(id) {
+  return (id != null && profileIconBase) ? `${profileIconBase}${id}.png` : null;
 }
 
 function champChip(id, size = 22) {
@@ -145,18 +168,28 @@ function renderProfile(p) {
       </div>`;
   }
 
+  const iconUrl = profileIconUrl(p.profileIconId);
+  const avatar = iconUrl
+    ? `<img class="summoner-icon" src="${esc(iconUrl)}" alt="" loading="lazy" onerror="this.style.display='none'"/>`
+    : `<div class="summoner-icon summoner-icon-empty">${esc((p.gameName || '?').charAt(0))}</div>`;
+
   return `
     <div class="profile-banner">
       <div class="profile-identity">
-        <div class="rank-emblem-wrap">${emblemImg}</div>
+        <div class="summoner-avatar">
+          ${avatar}
+          <span class="level-badge">${esc(p.summonerLevel ?? '—')}</span>
+        </div>
         <div class="profile-info">
           <div class="profile-name">${esc(p.gameName)}<span class="profile-tag">#${esc(p.tagLine)}</span>${cached}</div>
           <div class="profile-meta">
-            <span class="profile-level">Nivel ${esc(p.summonerLevel ?? '—')}</span>
-            <span class="profile-region">${esc(p.region)}</span>
+            <span class="profile-region">${esc(p.region.toUpperCase())}</span>
           </div>
-          ${rankBlock}
         </div>
+      </div>
+      <div class="rank-panel">
+        <div class="rank-emblem-wrap">${emblemImg}</div>
+        <div class="rank-detail">${rankBlock}</div>
       </div>
     </div>
     <div class="profile-footer">
@@ -243,9 +276,18 @@ const MATCHES_PER_PAGE = 10;
 
 /** Estado de paginación del historial. */
 const matchState = {
-  all: [],   // array completo de partidas
-  page: 0,   // página actual (0-based)
+  all: [],        // array completo de partidas
+  page: 0,        // página actual (0-based)
+  expanded: null, // matchId expandido (o null)
 };
+
+/** Nombre corto de cola por queueId. */
+const QUEUE_NAMES = {
+  420: 'Clasif. Solo/Dúo', 440: 'Clasif. Flexible', 400: 'Normal Draft', 430: 'Normal',
+  450: 'ARAM', 490: 'Normal Rápida', 480: 'Swiftplay', 700: 'Clash', 830: 'Co-op vs IA',
+  840: 'Co-op vs IA', 850: 'Co-op vs IA', 900: 'URF', 1700: 'Arena', 1900: 'URF',
+};
+const queueName = (id) => QUEUE_NAMES[id] || `Cola ${id}`;
 
 /**
  * Formatea la duración en segundos como "mm:ss".
@@ -319,19 +361,24 @@ function renderMatchPage() {
     const rel     = m.playedAt ? fmtRelative(m.playedAt) : '';
     const winCls  = m.win ? 'win' : 'loss';
     const rowCls  = m.win ? 'win-row' : 'loss-row';
-    const result  = m.win ? 'V' : 'D';
+    const result  = m.win ? 'Victoria' : 'Derrota';
+    const isOpen  = matchState.expanded === m.matchId;
 
-    return `<div class="match-row ${rowCls}">
-      ${iconEl}
-      <div class="match-center">
-        <div class="match-name">${esc(m.championName || champName(m.championId))}</div>
-        <div class="match-meta">
-          <span class="match-role">${esc(role)}</span>
-          <span class="match-kda">${kda}</span>
-          <span class="match-time">${esc(dur)}${rel ? ' · ' + esc(rel) : ''}</span>
+    return `<div class="match-item ${isOpen ? 'open' : ''}">
+      <button class="match-row ${rowCls}" data-mid="${esc(m.matchId)}" aria-expanded="${isOpen}">
+        ${iconEl}
+        <div class="match-center">
+          <div class="match-name">${esc(m.championName || champName(m.championId))} <span class="match-queue">${esc(queueName(m.queueId))}</span></div>
+          <div class="match-meta">
+            <span class="match-kda">${kda}</span>
+            <span class="match-role">${esc(role)}</span>
+            <span class="match-time">${esc(rel || dur)}</span>
+          </div>
         </div>
-      </div>
-      <span class="match-result ${winCls}">${result}</span>
+        <span class="match-result ${winCls}">${result}</span>
+        <span class="match-caret">${isOpen ? '▾' : '▸'}</span>
+      </button>
+      ${isOpen ? renderMatchDetail(m) : ''}
     </div>`;
   }).join('');
 
@@ -341,6 +388,50 @@ function renderMatchPage() {
   prev.disabled = page === 0;
   next.disabled = page >= totalPages - 1;
   pag.hidden = totalPages <= 1;
+}
+
+/** Detalle expandido de una partida: ítems, hechizos y estadísticas. */
+function renderMatchDetail(m) {
+  const items = (m.items || []).map((id) => {
+    const url = itemIconUrl(id);
+    return id && url
+      ? `<img class="detail-item" src="${esc(url)}" alt="" loading="lazy" onerror="this.classList.add('empty')"/>`
+      : `<span class="detail-item empty"></span>`;
+  }).join('');
+  const spells = (m.summonerSpells || []).map((id) => {
+    const url = summonerSpellIconUrl(id);
+    return url ? `<img class="detail-spell" src="${esc(url)}" alt="" loading="lazy"/>` : '';
+  }).join('');
+  const perMin = m.durationSec ? (m.cs / (m.durationSec / 60)).toFixed(1) : '0';
+  const kdaRatio = m.deaths === 0 ? 'Perfecto' : ((m.kills + m.assists) / m.deaths).toFixed(2);
+  const stat = (label, value) => `<div class="detail-stat"><span class="ds-val">${esc(value)}</span><span class="ds-label">${esc(label)}</span></div>`;
+
+  return `<div class="match-detail">
+    <div class="detail-loadout">
+      <div class="detail-spells">${spells}</div>
+      <div class="detail-items">${items}</div>
+    </div>
+    <div class="detail-stats">
+      ${stat('KDA', kdaRatio)}
+      ${stat('CS', `${m.cs} (${perMin}/m)`)}
+      ${stat('Oro', (m.gold / 1000).toFixed(1) + 'k')}
+      ${stat('Daño', (m.damage / 1000).toFixed(1) + 'k')}
+      ${stat('Visión', m.visionScore)}
+      ${stat('Nivel', m.championLevel)}
+    </div>
+    <div class="detail-foot">${esc(fmtDuration(m.durationSec || 0))} · ${esc(queueName(m.queueId))} · ${esc(m.playedAt ? fmtRelative(m.playedAt) : '')}</div>
+  </div>`;
+}
+
+/** Manejo de click en una fila para expandir/colapsar (delegación). */
+function initMatchClicks() {
+  $('matchesBody').addEventListener('click', (e) => {
+    const row = e.target.closest('.match-row[data-mid]');
+    if (!row) return;
+    const mid = row.getAttribute('data-mid');
+    matchState.expanded = matchState.expanded === mid ? null : mid;
+    renderMatchPage();
+  });
 }
 
 /**
@@ -365,12 +456,13 @@ async function refreshMatches() {
 
 // Listeners de paginación
 $('matchPrevBtn').addEventListener('click', () => {
-  if (matchState.page > 0) { matchState.page -= 1; renderMatchPage(); }
+  if (matchState.page > 0) { matchState.page -= 1; matchState.expanded = null; renderMatchPage(); }
 });
 $('matchNextBtn').addEventListener('click', () => {
   const totalPages = Math.ceil(matchState.all.length / MATCHES_PER_PAGE);
-  if (matchState.page < totalPages - 1) { matchState.page += 1; renderMatchPage(); }
+  if (matchState.page < totalPages - 1) { matchState.page += 1; matchState.expanded = null; renderMatchPage(); }
 });
+initMatchClicks();
 
 // --- Build --------------------------------------------------------------
 function renderBuild(b) {
@@ -537,8 +629,14 @@ async function tick() {
   await refreshContext(status?.clientState);
 }
 
-loadCatalog();
-refreshRiotPanels();
-tick();
+// Arranque: primero conocemos el estado del cliente, luego perfil y contexto,
+// así el perfil sabe si mostrar "última sesión".
+async function boot() {
+  await loadCatalog();
+  await refreshStatus();
+  refreshRiotPanels();
+  tick();
+}
+boot();
 setInterval(tick, 4000);
 setInterval(() => { refreshRiotPanels(); if (catalogById.size === 0) loadCatalog(); }, 30000);

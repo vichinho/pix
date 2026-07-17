@@ -822,3 +822,92 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
   line-height: 1.6;
   letter-spacing: 0.1px;
 }
+
+/* ══════════════════════════════════════
+   PERFIL — icono de invocador + rango
+══════════════════════════════════════ */
+.profile-banner { padding: 1.25rem 1.3rem 1rem; }
+.profile-identity { display: flex; align-items: center; gap: 0.9rem; }
+.summoner-avatar { position: relative; flex-shrink: 0; }
+.summoner-icon {
+  width: 60px; height: 60px; border-radius: 16px; object-fit: cover;
+  border: 1px solid var(--border); background: var(--panel-2);
+}
+.summoner-icon-empty {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; font-weight: 600; color: var(--faint);
+}
+.level-badge {
+  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  background: var(--panel-3); border: 1px solid var(--border);
+  color: var(--text); font-size: 0.68rem; font-weight: 600;
+  padding: 0.05rem 0.5rem; border-radius: 99px; white-space: nowrap;
+}
+.profile-info { min-width: 0; }
+.profile-name { font-size: 1.05rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.profile-tag { color: var(--faint); font-weight: 400; }
+.profile-meta { margin-top: 0.15rem; display: flex; gap: 0.5rem; }
+.profile-region { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.06em; }
+
+.rank-panel {
+  margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border-soft);
+  display: flex; align-items: center; gap: 0.85rem;
+}
+.rank-emblem-wrap { flex-shrink: 0; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; }
+.rank-emblem-wrap img { width: 46px; height: 46px; object-fit: contain; }
+.rank-detail { flex: 1; min-width: 0; }
+.rank-row { display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap; }
+.rank-tier { font-weight: 600; text-transform: capitalize; }
+.rank-division { color: var(--muted); }
+.rank-lp { color: var(--accent); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.rank-queue-label { margin-left: auto; font-size: 0.68rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.rank-wr-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem; }
+.wr-bar-track { flex: 1; height: 5px; border-radius: 99px; background: var(--panel-3); overflow: hidden; }
+.wr-bar-fill { height: 100%; background: var(--win); border-radius: 99px; }
+.wr-bar-fill.low { background: var(--loss); }
+.wr-text { font-size: 0.74rem; font-variant-numeric: tabular-nums; }
+.wr-text.good { color: var(--win); } .wr-text.bad { color: var(--loss); }
+.ranked-record { font-size: 0.7rem; color: var(--faint); margin-top: 0.3rem; }
+.rank-unranked { color: var(--muted); font-size: 0.85rem; }
+.profile-footer { padding: 0 1.3rem 0.6rem; }
+
+/* ══════════════════════════════════════
+   HISTORIAL — filas expandibles
+══════════════════════════════════════ */
+.match-item { border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 0.35rem; }
+.match-row {
+  width: 100%; display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.55rem 0.6rem; background: var(--panel-2); border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--faint); border-radius: var(--radius-sm);
+  cursor: pointer; text-align: left; color: inherit; font: inherit; transition: background var(--transition);
+}
+.match-row:hover { background: var(--panel-3); }
+.match-row.win-row  { border-left-color: var(--win); }
+.match-row.loss-row { border-left-color: var(--loss); }
+.match-item.open .match-row { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.match-champ-icon { width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0; border: 1px solid var(--border); }
+.match-center { flex: 1; min-width: 0; }
+.match-name { font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; }
+.match-queue { font-size: 0.64rem; color: var(--faint); font-weight: 400; }
+.match-meta { display: flex; gap: 0.5rem; font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+.match-kda { color: var(--text); font-variant-numeric: tabular-nums; }
+.kda-good { color: var(--accent); }
+.match-result { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.match-result.win { color: var(--win); } .match-result.loss { color: var(--loss); }
+.match-caret { color: var(--faint); font-size: 0.7rem; width: 0.8rem; text-align: center; }
+
+.match-detail {
+  background: var(--panel); border: 1px solid var(--border-soft); border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm); padding: 0.75rem 0.7rem;
+}
+.detail-loadout { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.7rem; }
+.detail-spells { display: flex; gap: 0.25rem; }
+.detail-spell { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border); }
+.detail-items { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+.detail-item { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); }
+.detail-item.empty { background: var(--panel-2); border-style: dashed; opacity: 0.4; }
+.detail-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+.detail-stat { background: var(--panel-2); border-radius: var(--radius-xs); padding: 0.4rem 0.5rem; text-align: center; }
+.ds-val { display: block; font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ds-label { display: block; font-size: 0.62rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.1rem; }
+.detail-foot { margin-top: 0.6rem; font-size: 0.68rem; color: var(--faint); text-align: center; }

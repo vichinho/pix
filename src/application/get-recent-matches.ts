@@ -30,6 +30,7 @@ export class GetRecentMatchesUseCase {
       queueId: match.info.queueId,
       championId: me.championId,
       championName: me.championName,
+      championLevel: me.champLevel ?? 0,
       role: mapTeamPosition(me.teamPosition ?? me.individualPosition),
       kills: me.kills,
       deaths: me.deaths,
@@ -37,6 +38,14 @@ export class GetRecentMatchesUseCase {
       win: me.win,
       durationSec: match.info.gameDuration,
       playedAt: new Date(playedAtMs).toISOString(),
+      items: [me.item0, me.item1, me.item2, me.item3, me.item4, me.item5, me.item6].map(
+        (i) => i ?? 0,
+      ),
+      summonerSpells: [me.summoner1Id ?? 0, me.summoner2Id ?? 0],
+      cs: (me.totalMinionsKilled ?? 0) + (me.neutralMinionsKilled ?? 0),
+      gold: me.goldEarned ?? 0,
+      damage: me.totalDamageDealtToChampions ?? 0,
+      visionScore: me.visionScore ?? 0,
     };
   }
 }

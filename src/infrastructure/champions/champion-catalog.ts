@@ -35,6 +35,7 @@ export interface ChampionCatalogData {
   spellIconBase: string;
   passiveIconBase: string;
   shardIconBase: string;
+  profileIconBase: string;
   champions: ChampionCatalogEntry[];
 }
 
@@ -150,6 +151,7 @@ export class ChampionCatalog {
         spellIconBase: `${DDRAGON}/cdn/${version}/img/spell/`,
         passiveIconBase: `${DDRAGON}/cdn/${version}/img/passive/`,
         shardIconBase: `${DDRAGON}/cdn/img/perk-images/StatMods/`,
+        profileIconBase: `${DDRAGON}/cdn/${version}/img/profileicon/`,
         champions: metas.map((m) => ({ id: m.id, name: m.name, image: m.image })),
       };
       this.byId = new Map(metas.map((m) => [m.id, m]));

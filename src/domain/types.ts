@@ -64,6 +64,7 @@ export interface MatchSummary {
   queueId: number;
   championId: number;
   championName: string;
+  championLevel: number;
   role: Role;
   kills: number;
   deaths: number;
@@ -71,6 +72,18 @@ export interface MatchSummary {
   win: boolean;
   durationSec: number;
   playedAt: string;
+  /** Ítems finales (7 slots, 0 = vacío). */
+  items: number[];
+  /** Hechizos de invocador [d, f]. */
+  summonerSpells: number[];
+  /** Súbditos + monstruos neutrales. */
+  cs: number;
+  /** Oro ganado. */
+  gold: number;
+  /** Daño total a campeones. */
+  damage: number;
+  /** Puntuación de visión. */
+  visionScore: number;
 }
 
 /** Contrato: estado del cliente (GET /api/client/status). */

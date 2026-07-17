@@ -57,12 +57,27 @@ export interface RiotParticipantDto {
   puuid: string;
   championId: number;
   championName: string;
+  champLevel?: number;
   kills: number;
   deaths: number;
   assists: number;
   win: boolean;
   teamPosition?: string;
   individualPosition?: string;
+  item0?: number;
+  item1?: number;
+  item2?: number;
+  item3?: number;
+  item4?: number;
+  item5?: number;
+  item6?: number;
+  summoner1Id?: number;
+  summoner2Id?: number;
+  totalMinionsKilled?: number;
+  neutralMinionsKilled?: number;
+  goldEarned?: number;
+  totalDamageDealtToChampions?: number;
+  visionScore?: number;
 }
 
 /** Normaliza la posición (mayúsculas de match-v5) a nuestro Role. */
