@@ -16,6 +16,7 @@ import { GetLiveChampionUseCase } from '../application/get-live-champion.js';
 import { GetLiveGameStateUseCase } from '../application/get-live-game-state.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
+import { UggBuildProvider } from '../infrastructure/champions/ugg-build-provider.js';
 import {
   ArchetypeBuildProvider,
   CatalogArchetypeBuildProvider,
@@ -47,6 +48,8 @@ export interface ServerDeps {
   /** Cliente Riot API; si es null/ausente, las rutas de perfil/historial devuelven 503. */
   riotClient?: RiotApiClient | null;
   buildProvider?: BuildProvider;
+  /** Proveedor de builds del meta en vivo (u.gg). Se antepone a la seed si se pasa. */
+  uggProvider?: UggBuildProvider | null;
   /** Directorio de la UI web estática. Por defecto, la carpeta `public` del repo. */
   staticDir?: string | null;
   /** Almacén de la última identidad conectada (por defecto en memoria). */
@@ -135,9 +138,13 @@ export function createServer(deps: ServerDeps = {}): Express {
     champSelectReader,
   );
   const getAramAnalysis = new GetAramAnalysisUseCase(aramReader, championTraits);
+  const uggProvider = deps.uggProvider ?? null;
   const buildProvider =
     deps.buildProvider ??
     new FallbackBuildProvider([
+      // Meta en vivo (u.gg) primero: builds específicas por campeón y parche.
+      // Si u.gg no responde o cambia de formato, cae a las curadas/arquetipo.
+      ...(uggProvider ? [uggProvider] : []),
       new SeedBuildProvider(),
       new CatalogArchetypeBuildProvider(championCatalog),
       new ArchetypeBuildProvider(championTraits),
@@ -422,7 +429,7 @@ export function createServer(deps: ServerDeps = {}): Express {
 
       // 3. Obtener build pasando rol ARAM para activar la lógica específica
       //    (summoners Flash+Mark, ítems de ARAM, etc.)
-      const build = getChampionBuild.execute(live.championId, 'ARAM');
+      const build = await getChampionBuild.execute(live.championId, 'ARAM');
 
       // getChampionBuild nunca debería retornar null (DefaultBuildProvider como
       // último recurso), pero lo manejamos por si acaso.
@@ -538,7 +545,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       }
       // Asegura el catálogo (best-effort) para inferir la build de cualquier campeón.
       await championCatalog.getData().catch(() => null);
-      const build = getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
+      const build = await getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
       if (!build) {
         res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });
         return;
@@ -548,6 +555,25 @@ export function createServer(deps: ServerDeps = {}): Express {
       } catch {
         res.json(bareEnrichedBuild(build));
       }
+    }),
+  );
+
+  // Diagnóstico: devuelve el JSON CRUDO de u.gg para un campeón, para calibrar el
+  // parser con datos reales (u.gg no es accesible desde el entorno de desarrollo).
+  app.get(
+    '/api/builds/debug-ugg',
+    wrap(async (req: Request, res: Response) => {
+      if (!uggProvider) {
+        res.status(503).json({ error: 'ugg_disabled' });
+        return;
+      }
+      const parsed = buildsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+        return;
+      }
+      const role = parsed.data.role ?? 'ARAM';
+      res.json(await uggProvider.debug(parsed.data.championId, role));
     }),
   );
 

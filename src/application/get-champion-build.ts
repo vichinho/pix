@@ -8,7 +8,7 @@ import type { BuildProvider } from '../domain/build.js';
 export class GetChampionBuildUseCase {
   constructor(private readonly provider: BuildProvider) {}
 
-  execute(championId: number, role: Role): ChampionBuild | null {
+  async execute(championId: number, role: Role): Promise<ChampionBuild | null> {
     return this.provider.getBuild(championId, role);
   }
 }

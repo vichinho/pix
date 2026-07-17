@@ -60,22 +60,22 @@ describe('FallbackBuildProvider', () => {
     patch: '1',
   };
 
-  it('usa el primer proveedor que responde', () => {
+  it('usa el primer proveedor que responde', async () => {
     const fb = new FallbackBuildProvider([stub('a', null), stub('b', sample)]);
-    expect(fb.getBuild(1, 'MIDDLE')?.source).toBe('ext');
+    expect((await fb.getBuild(1, 'MIDDLE'))?.source).toBe('ext');
   });
 
-  it('devuelve null si ninguno cubre', () => {
+  it('devuelve null si ninguno cubre', async () => {
     const fb = new FallbackBuildProvider([stub('a', null), stub('b', null)]);
-    expect(fb.getBuild(1, 'MIDDLE')).toBeNull();
+    expect(await fb.getBuild(1, 'MIDDLE')).toBeNull();
   });
 });
 
 describe('GetChampionBuildUseCase', () => {
-  it('delega en el proveedor', () => {
+  it('delega en el proveedor', async () => {
     const uc = new GetChampionBuildUseCase(new SeedBuildProvider());
-    expect(uc.execute(134, 'MIDDLE')?.championName).toBe('Syndra');
-    expect(uc.execute(999999, 'MIDDLE')).toBeNull();
+    expect((await uc.execute(134, 'MIDDLE'))?.championName).toBe('Syndra');
+    expect(await uc.execute(999999, 'MIDDLE')).toBeNull();
   });
 });
 
