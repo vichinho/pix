@@ -305,10 +305,23 @@ async function submitRiotId() {
     setLinkedRiotId(gameName, tagLine);
     refreshRiotPanels();
   } else if (msg) {
-    const reason = check.status === 404 ? 'No se encontró esa cuenta.' : (check.data?.error || `Error ${check.status}`);
-    msg.textContent = `No se pudo vincular: ${esc(reason)}`;
+    msg.innerHTML = riotErrorEs(check);
     msg.className = 'link-msg err';
   }
+}
+
+/** Traduce los errores de la Riot API a mensajes claros en español. */
+function riotErrorEs(resp) {
+  const code = resp.data?.error;
+  if (resp.status === 404 || code === 'not_found')
+    return 'No se encontró esa cuenta. Revisa el Nombre#TAG (respeta mayúsculas y el tag correcto).';
+  if (code === 'riot_api_key_invalid' || code === 'riot_api_key_forbidden_or_expired')
+    return 'Tu clave de Riot API no es válida o expiró. Las claves de desarrollo caducan cada 24 h: '
+      + 'genera una nueva en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a>, '
+      + 'actualízala en tu archivo <code>.env</code> (RIOT_API_KEY) y reinicia la app.';
+  if (code === 'riot_rate_limited')
+    return 'La Riot API está limitando las peticiones (rate limit). Espera unos segundos e inténtalo de nuevo.';
+  return `No se pudo vincular: ${esc(code || `Error ${resp.status}`)}`;
 }
 
 // --- Perfil / stats / partidas -----------------------------------------
@@ -333,14 +346,24 @@ async function refreshRiotPanels() {
     wireLinkForm();
     refreshStats();
     refreshMatches();
-  } else if (prof.status === 400) {
+  } else if (prof.status === 400 && prof.data?.error === 'identity_unavailable') {
     $('profileBody').innerHTML = renderLinkForm();
     wireLinkForm();
     $('statsBody').innerHTML = '<span class="muted">—</span>';
     matchState.all = [];
     renderMatchPage();
   } else {
-    $('profileBody').innerHTML = `<div style="padding:1.4rem 1.3rem"><span class="err">No se pudo cargar el perfil (${esc(prof.data?.error || prof.status)}).</span></div>`;
+    // Error real (clave inválida/expirada, rate limit, cuenta no encontrada…):
+    // mostramos el formulario con un mensaje claro para poder reintentar.
+    const isKeyError = prof.data?.error === 'riot_api_key_invalid' || prof.data?.error === 'riot_api_key_forbidden_or_expired';
+    if (isKeyError) { $('riotBadge').textContent = 'Riot API ⚠'; $('riotBadge').className = 'pill off'; }
+    $('profileBody').innerHTML = renderLinkForm();
+    wireLinkForm();
+    const msg = $('riotIdMsg');
+    if (msg) { msg.innerHTML = riotErrorEs(prof); msg.className = 'link-msg err'; }
+    $('statsBody').innerHTML = '<span class="muted">—</span>';
+    matchState.all = [];
+    renderMatchPage();
   }
 }
 
