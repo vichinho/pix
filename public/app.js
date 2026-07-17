@@ -485,6 +485,13 @@ function renderBuild(b) {
 
 // --- Contexto -----------------------------------------------------------
 async function refreshContext(clientState) {
+  // La Live Client API (puerto 2999) es independiente del LCU: funciona incluso
+  // cuando el LCU se satura o devuelve UNKNOWN. La consultamos primero para que
+  // el coach en partida aparezca siempre que haya una partida en curso, sin
+  // depender de que clientState sea 'IN_GAME'.
+  const live = await api('/api/live/champion');
+  const liveActive = live.ok && live.data?.active && live.data.championId;
+
   const queue = await api('/api/game/queue');
   const qBadge = $('queueBadge');
   if (queue.ok && queue.data?.active && queue.data.queue) {
@@ -495,7 +502,11 @@ async function refreshContext(clientState) {
     qBadge.className = 'pill ghost';
   }
   const isAram = queue.ok && queue.data?.queue?.category === 'ARAM';
-  if (clientState === 'IN_GAME')    return refreshInGame();
+
+  // En partida (detectado por Live Client API o por el estado del LCU).
+  // En ARAM la banca sólo existe en la fase previa (champ-select); una vez
+  // dentro de la partida mostramos el coach en vivo con el campeón real.
+  if (liveActive || clientState === 'IN_GAME') return refreshInGame(live);
   if (isAram)                       return refreshAram();
   if (clientState === 'CHAMP_SELECT') return refreshChampSelect();
   $('contextTitle').textContent = 'Contexto';
@@ -540,11 +551,11 @@ async function refreshChampSelect() {
     <div class="block"><div class="label">Sugerencias para tu rol</div>${recHtml}</div>`;
 }
 
-async function refreshInGame() {
+async function refreshInGame(livePrefetched) {
   $('contextTitle').textContent = 'En partida';
   let championId = null;
   let role = lastPickedRole;
-  const live = await api('/api/live/champion');
+  const live = livePrefetched ?? (await api('/api/live/champion'));
   if (live.ok && live.data?.active && live.data.championId) {
     championId = live.data.championId;
     role = live.data.role && live.data.role !== 'UNKNOWN' ? live.data.role : role;
@@ -654,8 +665,8 @@ async function refreshAram() {
   let buildHtml = '';
   if (localChamp) {
     lastPickedChampionId = localChamp.championId;
-    lastPickedRole = 'UNKNOWN';
-    const b = await api(`/api/builds?championId=${localChamp.championId}&role=UNKNOWN`);
+    lastPickedRole = 'ARAM';
+    const b = await api(`/api/builds?championId=${localChamp.championId}&role=ARAM`);
     if (b.ok) {
       buildHtml = `<div class="block"><div class="label">Tu build</div>${renderBuild(b.data)}</div>`;
     }

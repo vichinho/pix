@@ -52,7 +52,7 @@ describe('computeObjectives', () => {
 });
 
 function fakeConnector(handler: (path: string) => unknown): LiveClientConnector {
-  return { request: async (path: string) => handler(path) };
+  return { request: async (path: string) => handler(path) } as unknown as LiveClientConnector;
 }
 
 describe('LiveGameReader.getGameState', () => {

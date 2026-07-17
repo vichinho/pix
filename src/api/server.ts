@@ -67,7 +67,7 @@ const recommendationsQuerySchema = z.object({
 
 const buildsQuerySchema = z.object({
   championId: z.coerce.number().int().positive(),
-  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'UNKNOWN']).optional(),
+  role: z.enum(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY', 'ARAM', 'UNKNOWN']).optional(),
 });
 
 const identityQuerySchema = z.object({
