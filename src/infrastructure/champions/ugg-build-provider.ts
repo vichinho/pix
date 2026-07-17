@@ -34,6 +34,19 @@ function uggGameMode(role: Role): string {
   return role === 'ARAM' ? 'aram' : 'ranked_solo_5x5';
 }
 
+/**
+ * Headers de navegador. El CDN de u.gg (stats2) responde 403 a peticiones sin
+ * un User-Agent creíble; enviarlos evita el bloqueo anti-bots.
+ */
+const BROWSER_HEADERS: Record<string, string> = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  Origin: 'https://u.gg',
+  Referer: 'https://u.gg/',
+};
+
 export interface UggConfig {
   /** Parche en formato u.gg, p. ej. "15_1". Si se omite, se descubre online. */
   patch?: string;
@@ -99,12 +112,20 @@ export class UggBuildProvider implements BuildProvider {
     return build;
   }
 
+  /** GET con headers de navegador y timeout. */
+  private get(url: string): Promise<Response> {
+    return this.fetchImpl(url, {
+      headers: BROWSER_HEADERS,
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+  }
+
   /** Descarga el JSON crudo del overview de u.gg (o null si falla). Público para diagnóstico. */
   async fetchRawOverview(championId: number, role: Role): Promise<unknown | null> {
     const ver = await this.resolveVersion();
     if (!ver) return null;
     const url = this.overviewUrl(championId, role, ver);
-    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(this.timeoutMs) });
+    const res = await this.get(url);
     if (!res.ok) return null;
     return (await res.json()) as unknown;
   }
@@ -151,7 +172,7 @@ export class UggBuildProvider implements BuildProvider {
       base.version = ver.version;
       const url = this.overviewUrl(championId, role, ver);
       base.url = url;
-      const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(this.timeoutMs) });
+      const res = await this.get(url);
       base.httpStatus = res.status;
       if (!res.ok) return base;
       const raw = (await res.json()) as unknown;
@@ -182,7 +203,7 @@ export class UggBuildProvider implements BuildProvider {
   private async discoverVersion(): Promise<{ patch: string; version: string } | null> {
     const url =
       'https://static.bigbrain.gg/assets/lol/riot_patch_update/prod/ugg/ugg-api-versions.json';
-    const res = await this.fetchImpl(url, { signal: AbortSignal.timeout(this.timeoutMs) });
+    const res = await this.get(url);
     if (!res.ok) return null;
     const json = (await res.json()) as Record<string, Record<string, string>>;
     // El parche más alto (claves tipo "15_1", "14_24"…). Orden numérico por partes.
