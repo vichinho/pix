@@ -159,10 +159,17 @@ export class UggBuildProvider implements BuildProvider {
     if (!ver) return { patch: null, version: null, attempts, firstOkUrl, raw };
 
     const primary = ver.version.split('.').slice(0, 2).join('.');
-    const modes = ['ranked_solo_5x5', 'aram', 'normal_aram', 'ranked_aram'];
-    const urls = modes.map(
-      (m) => `https://stats2.u.gg/lol/${primary}/overview/${ver.patch}/${m}/${championId}/${ver.version}.json`,
-    );
+    // Modo SR (conocido) sobre el parche actual y los 3 anteriores, más los
+    // modos ARAM sobre el parche actual. Descarta "parche aún sin publicar".
+    const olderPatches = recentPatches(ver.patch, 4);
+    const urls = [
+      ...olderPatches.map(
+        (p) => `https://stats2.u.gg/lol/${primary}/overview/${p}/ranked_solo_5x5/${championId}/${ver.version}.json`,
+      ),
+      ...['aram', 'normal_aram'].map(
+        (m) => `https://stats2.u.gg/lol/${primary}/overview/${ver.patch}/${m}/${championId}/${ver.version}.json`,
+      ),
+    ];
     for (const url of urls) {
       try {
         const res = await this.get(url);
@@ -342,6 +349,15 @@ export class UggBuildProvider implements BuildProvider {
     }
     return order;
   }
+}
+
+/** Lista de parches recientes: el dado y los N-1 anteriores (bajando el minor). */
+function recentPatches(patch: string, n: number): string[] {
+  const [major, minor] = patch.split('_').map(Number);
+  if (major == null || minor == null) return [patch];
+  const out: string[] = [];
+  for (let i = 0; i < n && minor - i > 0; i += 1) out.push(`${major}_${minor - i}`);
+  return out;
 }
 
 /** Compara dos parches "a_b" numéricamente (mayor = más nuevo). */
