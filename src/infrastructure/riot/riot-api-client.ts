@@ -214,13 +214,19 @@ export class RiotApiClient {
   }
 
   async getMatches(matchIds: string[]): Promise<RiotMatchDto[]> {
-    const results = new Array<RiotMatchDto>(matchIds.length);
+    const results = new Array<RiotMatchDto | undefined>(matchIds.length);
     let next = 0;
     const worker = async (): Promise<void> => {
       while (next < matchIds.length) {
         const index = next;
         next += 1;
-        results[index] = await this.getMatch(matchIds[index]!);
+        // Tolerante a fallos: si una partida concreta falla (rate limit, partida
+        // no disponible…), la omitimos en vez de tumbar todo el historial.
+        try {
+          results[index] = await this.getMatch(matchIds[index]!);
+        } catch {
+          results[index] = undefined;
+        }
       }
     };
     const workers = Array.from(
@@ -228,6 +234,6 @@ export class RiotApiClient {
       () => worker(),
     );
     await Promise.all(workers);
-    return results;
+    return results.filter((m): m is RiotMatchDto => m !== undefined);
   }
 }

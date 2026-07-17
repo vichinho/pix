@@ -149,6 +149,17 @@ describe('RiotApiClient rate limiting y cache', () => {
     const matches = await c.getMatches(['A', 'B', 'C', 'D', 'E']);
     expect(matches.map((m) => m.metadata.matchId)).toEqual(['A', 'B', 'C', 'D', 'E']);
   });
+
+  it('getMatches omite partidas que fallan en vez de tumbar todo el historial', async () => {
+    const fetchImpl: FetchLike = async (url) => {
+      const id = url.split('/matches/')[1] ?? '';
+      if (id === 'C') return { status: 404, ok: false, text: async () => 'not found' };
+      return { status: 200, ok: true, text: async () => JSON.stringify({ metadata: { matchId: id }, info: {} }) };
+    };
+    const c = new RiotApiClient({ apiKey: 'k', platform: 'la1', region: 'americas', fetchImpl, maxRetries: 0, matchConcurrency: 2 });
+    const matches = await c.getMatches(['A', 'B', 'C', 'D', 'E']);
+    expect(matches.map((m) => m.metadata.matchId)).toEqual(['A', 'B', 'D', 'E']);
+  });
 });
 
 describe('GetPlayerProfileUseCase', () => {

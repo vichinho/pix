@@ -853,8 +853,11 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
   margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border-soft);
   display: flex; align-items: center; gap: 0.85rem;
 }
-.rank-emblem-wrap { flex-shrink: 0; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; }
-.rank-emblem-wrap img { width: 46px; height: 46px; object-fit: contain; }
+.rank-emblem-wrap {
+  flex-shrink: 0; width: 68px; height: 68px; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.28); border-radius: 12px; border: 1px solid var(--border);
+}
+.rank-emblem-wrap img { width: 62px; height: 62px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
 .rank-detail { flex: 1; min-width: 0; }
 .rank-row { display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap; }
 .rank-tier { font-weight: 600; text-transform: capitalize; }
