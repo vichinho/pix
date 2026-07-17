@@ -187,8 +187,9 @@ function renderRunes(runes) {
 function rankEmblemSources(tier) {
   const t = (tier || '').toLowerCase();
   return [
-    `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${t}.png`,
+    // op.gg: cresta compacta que llena bien el recuadro.
     `https://opgg-static.akamaized.net/images/medals_new/${t}.png`,
+    `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${t}.png`,
     `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-regalia/${t}.png`,
   ];
 }
@@ -498,6 +499,7 @@ const matchState = {
   all: [],        // array completo de partidas
   page: 0,        // página actual (0-based)
   expanded: null, // matchId expandido (o null)
+  filter: '',     // filtro de modo ('' todos, '450' ARAM, 'ranked', 'normal')
 };
 
 /** Nombre corto de cola por queueId. */
@@ -658,13 +660,22 @@ function initMatchClicks() {
  * Carga TODAS las partidas recientes (hasta 50) en memoria y muestra la página 1.
  * Se llama una sola vez al cargar el perfil; después solo se repagina en cliente.
  */
+/** Sufijo de query del filtro de modo del historial (queueId o type). */
+function matchFilterQuery() {
+  const v = matchState.filter;
+  if (!v) return '';
+  if (v === 'ranked' || v === 'normal') return `&type=${v}`;
+  return `&queue=${encodeURIComponent(v)}`; // queueId numérico (450 = ARAM)
+}
+
 async function refreshMatches() {
   const body = $('matchesBody');
   body.innerHTML = '<span class="muted">Cargando partidas…</span>';
   $('matchPagination').hidden = true;
+  const fq = matchFilterQuery();
 
   // Tanda rápida: primeras 12 partidas para pintar el historial cuanto antes.
-  const first = await api(`/api/player/matches?count=12${riotIdQuery()}`);
+  const first = await api(`/api/player/matches?count=12${riotIdQuery()}${fq}`);
   if (!first.ok) {
     body.innerHTML = `<span class="err">${esc(first.data?.error || first.status)}</span>`;
     return;
@@ -676,7 +687,7 @@ async function refreshMatches() {
 
   // Tanda completa en segundo plano (el backend cachea, así que sólo trae las
   // partidas nuevas). Al terminar, refresca historial y estadísticas.
-  const full = await api(`/api/player/matches?count=50${riotIdQuery()}`);
+  const full = await api(`/api/player/matches?count=50${riotIdQuery()}${fq}`);
   if (full.ok && Array.isArray(full.data?.matches) && full.data.matches.length > matchState.all.length) {
     matchState.all = full.data.matches;
     renderMatchPage();
@@ -691,6 +702,13 @@ $('matchPrevBtn').addEventListener('click', () => {
 $('matchNextBtn').addEventListener('click', () => {
   const totalPages = Math.ceil(matchState.all.length / MATCHES_PER_PAGE);
   if (matchState.page < totalPages - 1) { matchState.page += 1; matchState.expanded = null; renderMatchPage(); }
+});
+
+// Filtro de modo del historial: al cambiar, recarga con el filtro elegido.
+$('matchQueueFilter').addEventListener('change', (e) => {
+  matchState.filter = e.target.value;
+  matchState.expanded = null;
+  refreshMatches();
 });
 initMatchClicks();
 

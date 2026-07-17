@@ -240,8 +240,15 @@ export class RiotApiClient {
     return this.request<RiotLeagueEntryDto[]>(this.platformHost(), path);
   }
 
-  getMatchIdsByPuuid(puuid: string, count: number): Promise<string[]> {
-    const path = `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?start=0&count=${count}`;
+  getMatchIdsByPuuid(
+    puuid: string,
+    count: number,
+    filter?: { queue?: number; type?: string },
+  ): Promise<string[]> {
+    const params = new URLSearchParams({ start: '0', count: String(count) });
+    if (filter?.queue != null) params.set('queue', String(filter.queue));
+    if (filter?.type) params.set('type', filter.type);
+    const path = `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?${params.toString()}`;
     return this.request<string[]>(this.regionHost(), path);
   }
 

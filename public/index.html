@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=7" />
   </head>
   <body>
     <header class="topbar">
@@ -54,6 +54,14 @@
             <span class="card-title">Historial de partidas</span>
             <span id="matchPageInfo" class="match-page-info"></span>
           </div>
+          <div class="match-filter">
+            <select id="matchQueueFilter" class="match-filter-select" aria-label="Filtrar por modo">
+              <option value="">Todos los modos</option>
+              <option value="450">ARAM</option>
+              <option value="ranked">Clasificatoria</option>
+              <option value="normal">Normal</option>
+            </select>
+          </div>
           <div id="matchesBody" class="muted text-sm">—</div>
           <div id="matchPagination" class="match-pagination" hidden>
             <button id="matchPrevBtn" class="pag-btn" disabled aria-label="Página anterior">‹</button>
@@ -85,6 +93,6 @@
       Proyecto personal no oficial · No afiliado ni patrocinado por Riot Games · League of Legends es marca registrada de Riot Games, Inc.
     </footer>
 
-    <script src="/app.js"></script>
+    <script src="/app.js?v=7"></script>
   </body>
 </html>

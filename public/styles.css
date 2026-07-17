@@ -854,10 +854,12 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
   display: flex; align-items: center; gap: 0.85rem;
 }
 .rank-emblem-wrap {
-  flex-shrink: 0; width: 68px; height: 68px; display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.28); border-radius: 12px; border: 1px solid var(--border);
+  flex-shrink: 0; width: 66px; height: 66px; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.28); border-radius: 12px; border: 1px solid var(--border); overflow: hidden;
 }
-.rank-emblem-wrap img { width: 62px; height: 62px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
+/* Muchos emblemas traen alas/relleno transparente enorme: los ampliamos y
+   recortamos el sobrante para que la cresta llene el recuadro. */
+.rank-emblem-wrap img { width: 100%; height: 100%; object-fit: contain; transform: scale(1.35); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
 .rank-detail { flex: 1; min-width: 0; }
 .rank-row { display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap; }
 .rank-tier { font-weight: 600; text-transform: capitalize; }
@@ -964,3 +966,12 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
   padding: 0; text-decoration: underline; text-underline-offset: 2px; font-family: inherit;
 }
 .linklike:hover { color: var(--accent); }
+
+/* Filtro de modo del historial */
+.match-filter { padding: 0 0 0.6rem; }
+.match-filter-select {
+  width: 100%; background: var(--panel-3); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); padding: 0.4rem 0.6rem; color: var(--text);
+  font-size: 0.78rem; font-family: inherit; outline: none; cursor: pointer;
+}
+.match-filter-select:focus { border-color: var(--accent); }

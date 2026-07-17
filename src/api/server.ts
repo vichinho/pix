@@ -78,6 +78,10 @@ const identityQuerySchema = z.object({
   count: z.coerce.number().int().min(1).max(50).optional(),
   /** Plataforma Riot (la1, la2, na1, euw1…) para enrutar summoner-v4/league-v4. */
   platform: z.string().min(2).max(5).optional(),
+  /** Filtro de historial por queueId (p. ej. 450 = ARAM). */
+  queue: z.coerce.number().int().positive().optional(),
+  /** Filtro de historial por tipo (ranked | normal | tourney). */
+  type: z.enum(['ranked', 'normal', 'tourney']).optional(),
 });
 
 /**
@@ -487,7 +491,15 @@ export function createServer(deps: ServerDeps = {}): Express {
       return;
     }
     try {
-      const matches = await routedRiot(parsed.data.platform).matches!.execute(identity, parsed.data.count ?? 10);
+      const filter = {
+        ...(parsed.data.queue != null ? { queue: parsed.data.queue } : {}),
+        ...(parsed.data.type ? { type: parsed.data.type } : {}),
+      };
+      const matches = await routedRiot(parsed.data.platform).matches!.execute(
+        identity,
+        parsed.data.count ?? 10,
+        filter,
+      );
       res.json({ matches });
     } catch (err) {
       riotErrorResponse(res, err);

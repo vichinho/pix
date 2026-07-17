@@ -10,9 +10,13 @@ import type { PlayerIdentity } from './get-player-profile.js';
 export class GetRecentMatchesUseCase {
   constructor(private readonly riot: RiotApiClient) {}
 
-  async execute(identity: PlayerIdentity, count = 10): Promise<MatchSummary[]> {
+  async execute(
+    identity: PlayerIdentity,
+    count = 10,
+    filter?: { queue?: number; type?: string },
+  ): Promise<MatchSummary[]> {
     const account = await this.riot.getAccountByRiotId(identity.gameName, identity.tagLine);
-    const matchIds = await this.riot.getMatchIdsByPuuid(account.puuid, count);
+    const matchIds = await this.riot.getMatchIdsByPuuid(account.puuid, count, filter);
 
     const matches = await this.riot.getMatches(matchIds);
     return matches
