@@ -27,6 +27,16 @@ function normalizeName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+/** Limpia el HTML de Data Dragon (tags, saltos) para usar como tooltip de texto. */
+export function stripHtml(s: string | undefined): string {
+  if (!s) return '';
+  return s
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export interface ChampionCatalogData {
   version: string;
   /** Base para construir URLs de icono: iconBase + entry.image */
@@ -43,17 +53,20 @@ export interface ChampionCatalogData {
 export interface RuneAsset {
   name: string;
   icon: string;
+  desc?: string;
 }
 
 export interface ItemEntry {
   id: number;
   name: string;
   image: string;
+  desc?: string;
 }
 
 export interface AbilityAsset {
   name: string;
   image: string;
+  desc?: string;
 }
 
 /** Habilidades del campeón (pasiva + Q/W/E/R). */
@@ -243,7 +256,7 @@ export class ChampionCatalog {
       this.items = new Map(
         Object.entries(raw.data).map(([id, v]) => [
           Number(id),
-          { id: Number(id), name: v.name, image: v.image.full },
+          { id: Number(id), name: v.name, image: v.image.full, desc: stripHtml(v.plaintext || v.description) },
         ]),
       );
       this.itemsLoadedAt = Date.now();
@@ -255,7 +268,9 @@ export class ChampionCatalog {
   private fetchItems(
     version: string,
     locale: string,
-  ): Promise<{ data: Record<string, { name: string; image: { full: string } }> }> {
+  ): Promise<{
+    data: Record<string, { name: string; image: { full: string }; plaintext?: string; description?: string }>;
+  }> {
     return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/item.json`);
   }
 
@@ -283,8 +298,8 @@ export class ChampionCatalog {
       );
       const cd = raw?.data[meta.ddragonId];
       if (!cd) return null;
-      const asset = (a?: { name: string; image: { full: string } }): AbilityAsset | null =>
-        a ? { name: a.name, image: a.image.full } : null;
+      const asset = (a?: { name: string; image: { full: string }; description?: string }): AbilityAsset | null =>
+        a ? { name: a.name, image: a.image.full, desc: stripHtml(a.description) } : null;
       const spells: ChampionSpells = {
         passive: asset(cd.passive),
         Q: asset(cd.spells?.[0]),
@@ -307,8 +322,8 @@ export class ChampionCatalog {
     data: Record<
       string,
       {
-        spells?: Array<{ name: string; image: { full: string } }>;
-        passive?: { name: string; image: { full: string } };
+        spells?: Array<{ name: string; image: { full: string }; description?: string }>;
+        passive?: { name: string; image: { full: string }; description?: string };
       }
     >;
   }> {
@@ -342,7 +357,7 @@ export class ChampionCatalog {
         styles.set(style.id, { name: style.name, icon: `${base}${style.icon}` });
         for (const slot of style.slots ?? []) {
           for (const rune of slot.runes ?? []) {
-            runes.set(rune.id, { name: rune.name, icon: `${base}${rune.icon}` });
+            runes.set(rune.id, { name: rune.name, icon: `${base}${rune.icon}`, desc: stripHtml(rune.shortDesc) });
           }
         }
       }
@@ -362,7 +377,7 @@ export class ChampionCatalog {
       id: number;
       name: string;
       icon: string;
-      slots?: Array<{ runes?: Array<{ id: number; name: string; icon: string }> }>;
+      slots?: Array<{ runes?: Array<{ id: number; name: string; icon: string; shortDesc?: string }> }>;
     }>
   > {
     return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/runesReforged.json`);

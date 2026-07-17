@@ -139,21 +139,29 @@ function champName(id) {
   return e ? e.name : `#${id}`;
 }
 
+/** Texto del tooltip: nombre + descripción (si hay). */
+function tipText(e, prefix) {
+  const name = `${prefix || ''}${e.name || ''}`;
+  return e.desc ? `${name} — ${e.desc}` : name;
+}
 function iconOrText(entry, cls) {
-  if (entry.icon) return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" title="${esc(entry.name)}" loading="lazy"/>`;
-  return `<span class="tagfallback">${esc(entry.name)}</span>`;
+  const tip = esc(tipText(entry));
+  if (entry.icon) return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" title="${tip}" loading="lazy"/>`;
+  return `<span class="tagfallback" title="${tip}">${esc(entry.name)}</span>`;
 }
 const itemRow = (items) => (items || []).map((i) => iconOrText(i, 'iicon')).join(' ');
 const summRow = (sums)  => (sums  || []).map((s) => iconOrText(s, 'sicon')).join(' ');
 function abilityRow(abils) {
-  return (abils || []).map((a) =>
-    `<span class="abil">${a.icon ? `<img class="sicon" src="${esc(a.icon)}" alt="${esc(a.name)}" title="${esc(a.name)}" loading="lazy"/>` : ''}<span class="ablabel">${esc(a.letter)}</span></span>`
-  ).join('<span class="arrow">›</span>');
+  return (abils || []).map((a) => {
+    const tip = esc(tipText(a, `${a.letter} · `));
+    return `<span class="abil" title="${tip}">${a.icon ? `<img class="sicon" src="${esc(a.icon)}" alt="${esc(a.name)}" loading="lazy"/>` : ''}<span class="ablabel">${esc(a.letter)}</span></span>`;
+  }).join('<span class="arrow">›</span>');
 }
 
 function runeRow(r, extraClass) {
+  const tip = esc(tipText(r));
   const img = r.icon ? `<img src="${esc(r.icon)}" alt="${esc(r.name)}" loading="lazy"/>` : '<span class="tagfallback">•</span>';
-  return `<div class="rune ${extraClass || ''}">${img}<span class="rn">${esc(r.name)}</span></div>`;
+  return `<div class="rune ${extraClass || ''}" title="${tip}">${img}<span class="rn">${esc(r.name)}</span></div>`;
 }
 function styleHead(style) {
   const img = style.icon ? `<img src="${esc(style.icon)}" alt="" loading="lazy"/>` : '';
@@ -714,15 +722,13 @@ initMatchClicks();
 
 // --- Build --------------------------------------------------------------
 function renderBuild(b) {
-  const passive = b.passive
-    ? `<span class="abil">${b.passive.icon ? `<img class="sicon" src="${esc(b.passive.icon)}" alt="${esc(b.passive.name)}" title="${esc(b.passive.name)}" loading="lazy"/>` : ''}<span class="ablabel">P</span></span>`
-    : '';
   return `
     <div class="kv">
       <span class="k">Campeón</span><span>${champChip(b.championId, 22)} · ${esc(ROLE_ES[b.role] || b.role)}</span>
       <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
-      <span class="k">Habilidades</span><span class="iconrow">${passive}${passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
+      <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
     </div>
+    ${skillOrderLine(b)}
     <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
     <div class="block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
     <div class="block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
@@ -736,6 +742,21 @@ function buildMeta(b) {
   const src = { curated: 'curada', classified: 'por campeón', archetype: 'por clase', default: 'genérica' }[b.source] || b.source;
   const patch = /^\d+\.\d+/.test(b.patch || '') ? `Parche ${b.patch}` : esc(b.patch);
   return `Build ${esc(src)} · ${patch}`;
+}
+
+/** Chip de la pasiva con tooltip. */
+function passiveChip(p) {
+  if (!p) return '';
+  const tip = esc(tipText(p, 'Pasiva · '));
+  return `<span class="abil" title="${tip}">${p.icon ? `<img class="sicon" src="${esc(p.icon)}" alt="${esc(p.name)}" loading="lazy"/>` : ''}<span class="ablabel">P</span></span>`;
+}
+
+/** Línea de orden de subida de habilidades (prioridad de maximización). */
+function skillOrderLine(b) {
+  const order = b.skillOrder || [];
+  if (!order.length) return '';
+  const seq = order.map((l) => `<span class="skill-key">${esc(l)}</span>`).join('<span class="skill-arrow">→</span>');
+  return `<div class="skill-order"><span class="so-label">Orden de subida</span><span class="so-seq">${seq}</span><span class="so-note">· sube R (6/11/16) siempre que puedas</span></div>`;
 }
 
 // --- Contexto -----------------------------------------------------------
@@ -771,10 +792,11 @@ async function refreshContext(clientState) {
 function renderRunesSummoners(b) {
   return `<div class="kv">
     <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
-    <span class="k">Habilidades</span><span class="iconrow">${abilityRow(b.abilities)}</span>
+    <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
   </div>
+  ${skillOrderLine(b)}
   <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
-  <div class="source-note">Fuente: ${esc(b.source)}</div>`;
+  <div class="source-note">${buildMeta(b)}</div>`;
 }
 
 async function refreshChampSelect() {
@@ -853,8 +875,13 @@ function objectiveCell(label, icon, o) {
   </div>`;
 }
 
-/** Panel de coach en vivo: tiempo, objetivos y consejo de power-spike. */
+/** Panel de coach en vivo. En ARAM no hay objetivos épicos: muestra otra ayuda. */
 function renderLiveCoach(g) {
+  return g.gameMode === 'ARAM' ? renderAramCoach(g) : renderRiftCoach(g);
+}
+
+/** Coach de Grieta: objetivos épicos, timers y power-spike. */
+function renderRiftCoach(g) {
   const o = g.objectives;
   const gold = g.player.currentGold;
   const spike =
@@ -876,6 +903,22 @@ function renderLiveCoach(g) {
     </div>
     <div class="coach-player">Nivel ${esc(g.player.level)} · ${esc(gold)} oro</div>
     ${advice.length ? `<ul class="coach-advice">${advice.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+  </div>`;
+}
+
+/** Coach de ARAM: sin barón/dragón; consejos propios del Abismo Aullador. */
+function renderAramCoach(g) {
+  const gold = g.player.currentGold;
+  const advice = [];
+  if (gold >= 1600) advice.push('💰 Tienes oro para un ítem completo — cómpralo al morir (no puedes volver a la base).');
+  advice.push('❤️ Recoge el orbe de salud del centro cuando pases por ahí: cura y da maná.');
+  advice.push('🤝 Agrúpate con tu equipo: en ARAM las peleas son 5v5 constantes, evita ir solo.');
+  advice.push('🛡️ Compra resistencias si el enemigo tiene mucho daño — mueres muy rápido en el pasillo único.');
+
+  return `<div class="block coach">
+    <div class="label">Coach ARAM · ${fmtCountdown(g.gameTime)}</div>
+    <div class="coach-player">Nivel ${esc(g.player.level)} · ${esc(gold)} oro</div>
+    <ul class="coach-advice">${advice.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
   </div>`;
 }
 

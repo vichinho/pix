@@ -1,11 +1,13 @@
 import type { ChampionBuild, Role } from '../domain/types.js';
 import type { ChampionCatalog } from '../infrastructure/champions/champion-catalog.js';
-import { summonerImageFile } from '../infrastructure/champions/summoner-assets.js';
+import { summonerImageFile, summonerDescription } from '../infrastructure/champions/summoner-assets.js';
 import { SHARD_META } from '../infrastructure/champions/rune-ids.js';
 
 export interface EnrichedIcon {
   name: string;
   icon: string | null;
+  /** Descripción breve para el tooltip al pasar el ratón. */
+  desc?: string;
 }
 
 export interface EnrichedItem extends EnrichedIcon {
@@ -112,12 +114,14 @@ export async function enrichBuild(
         id,
         name: it?.name ?? `#${id}`,
         icon: it && itemBase ? `${itemBase}${it.image}` : null,
+        ...(it?.desc ? { desc: it.desc } : {}),
       };
     });
 
   const summoners: EnrichedIcon[] = build.summonerSpells.map((name) => {
     const file = summonerImageFile(name);
-    return { name, icon: file && spellBase ? `${spellBase}${file}.png` : null };
+    const desc = summonerDescription(name);
+    return { name, icon: file && spellBase ? `${spellBase}${file}.png` : null, ...(desc ? { desc } : {}) };
   });
 
   const spellByLetter = (letter: string) =>
@@ -129,6 +133,7 @@ export async function enrichBuild(
       letter,
       name: a?.name ?? letter,
       icon: a && spellBase ? `${spellBase}${a.image}` : null,
+      ...(a?.desc ? { desc: a.desc } : {}),
     };
   });
 
@@ -136,13 +141,14 @@ export async function enrichBuild(
     ? {
         name: spells.passive.name,
         icon: passiveBase ? `${passiveBase}${spells.passive.image}` : null,
+        ...(spells.passive.desc ? { desc: spells.passive.desc } : {}),
       }
     : null;
 
   // Runas: resolvemos estilos, keystone, filas y fragmentos con su icono.
   const resolveRune = (id: number): EnrichedRune => {
     const r = catalog.getRuneSync(id);
-    return { id, name: r?.name ?? `#${id}`, icon: r?.icon ?? null };
+    return { id, name: r?.name ?? `#${id}`, icon: r?.icon ?? null, ...(r?.desc ? { desc: r.desc } : {}) };
   };
   const resolveStyle = (id: number): EnrichedIcon => {
     const s = catalog.getRuneStyleSync(id);

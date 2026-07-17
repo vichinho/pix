@@ -975,3 +975,20 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
   font-size: 0.78rem; font-family: inherit; outline: none; cursor: pointer;
 }
 .match-filter-select:focus { border-color: var(--accent); }
+
+/* Orden de subida de habilidades */
+.skill-order {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+  margin: 0.5rem 0 0.2rem; font-size: 0.78rem;
+}
+.so-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.66rem; }
+.so-seq { display: inline-flex; align-items: center; gap: 0.25rem; }
+.skill-key {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 5px; background: var(--accent-soft);
+  color: var(--accent); font-weight: 700; font-size: 0.72rem; border: 1px solid rgba(201,168,76,0.28);
+}
+.skill-arrow { color: var(--faint); font-size: 0.7rem; }
+.so-note { color: var(--faint); font-size: 0.68rem; }
+/* Los elementos con tooltip muestran cursor de ayuda */
+.iicon, .sicon, .rune, .abil, .tagfallback { cursor: help; }

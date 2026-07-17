@@ -79,6 +79,7 @@ export class LiveGameReader {
       );
       return {
         gameTime,
+        gameMode: data.gameData?.gameMode ?? 'CLASSIC',
         objectives: computeObjectives(gameTime, events),
         player: {
           level: data.activePlayer?.level ?? 0,
@@ -95,12 +96,14 @@ export class LiveGameReader {
 interface AllGameDataDto {
   activePlayer?: { level?: number; currentGold?: number };
   events?: { Events?: Array<{ EventName: string; EventTime: number }> };
-  gameData?: { gameTime?: number };
+  gameData?: { gameTime?: number; gameMode?: string };
 }
 
 /** Estado de la partida en curso. */
 export interface LiveGameState {
   gameTime: number;
+  /** Modo de juego (CLASSIC, ARAM, URF…). Determina si hay objetivos épicos. */
+  gameMode: string;
   objectives: Objectives;
   player: { level: number; currentGold: number };
 }
