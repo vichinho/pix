@@ -18,10 +18,14 @@ const BROWSER_HEADERS: Record<string, string> = {
 export interface LolalyticsProbeResult {
   url: string;
   status: number | string;
-  /** Claves de nivel superior de la respuesta (para inspeccionar la forma). */
+  /** Tipo de contenido devuelto. */
+  contentType?: string | null;
+  /** ¿El cuerpo parseó como JSON? */
+  isJson?: boolean;
+  /** Claves de nivel superior si es JSON. */
   topKeys?: string[];
-  /** Muestra recortada del JSON (para calibrar el parser sin volcar todo). */
-  sample?: unknown;
+  /** Primeros ~700 caracteres del cuerpo crudo (para ver el formato real). */
+  bodyPreview?: string;
 }
 
 export class LolalyticsClient {
@@ -35,10 +39,13 @@ export class LolalyticsClient {
    * `championId` es el id numérico de Riot.
    */
   async probe(championId: number): Promise<LolalyticsProbeResult[]> {
-    const base = 'https://a1.lolalytics.com/mega/?ep=champion&p=d&v=1';
+    // Variantes de parámetros y host para hallar el que devuelve JSON.
     const urls = [
-      `${base}&patch=30&cid=${championId}&lane=middle&tier=emerald_plus&queue=420&region=all`,
-      `${base}&patch=30&cid=${championId}&lane=default&tier=all&queue=450&region=all`,
+      `https://a1.lolalytics.com/mega/?ep=champion&v=1&patch=30&cid=${championId}&lane=middle&tier=emerald_plus&queue=420&region=all`,
+      `https://a1.lolalytics.com/mega/?ep=champion&p=d&v=1&patch=30&cid=${championId}&lane=middle&tier=emerald_plus&queue=420&region=all`,
+      `https://ax.lolalytics.com/mega/?ep=champion&v=1&patch=30&cid=${championId}&lane=middle&tier=emerald_plus&queue=420&region=all`,
+      `https://lolalytics.com/mega/?ep=champion&v=1&patch=30&cid=${championId}&lane=middle&tier=emerald_plus&queue=420&region=all`,
+      `https://a1.lolalytics.com/mega/?ep=champion&v=7&patch=30&cid=${championId}&lane=middle&tier=emerald_plus&queue=420&region=all`,
     ];
     const out: LolalyticsProbeResult[] = [];
     for (const url of urls) {
@@ -47,17 +54,19 @@ export class LolalyticsClient {
           headers: BROWSER_HEADERS,
           signal: AbortSignal.timeout(this.timeoutMs),
         });
-        const entry: LolalyticsProbeResult = { url, status: res.status };
-        if (res.ok) {
-          const json = (await res.json()) as Record<string, unknown>;
+        const text = await res.text();
+        const entry: LolalyticsProbeResult = {
+          url,
+          status: res.status,
+          contentType: res.headers.get('content-type'),
+          bodyPreview: text.slice(0, 700),
+        };
+        try {
+          const json = JSON.parse(text) as Record<string, unknown>;
+          entry.isJson = true;
           entry.topKeys = Object.keys(json).slice(0, 40);
-          // Muestra: algunas secciones típicas si existen, recortadas.
-          entry.sample = {
-            summonerSpells: json['summonerSpells'],
-            skills: json['skills'],
-            itemSets: json['itemSets'],
-            runes: json['runes'],
-          };
+        } catch {
+          entry.isJson = false;
         }
         out.push(entry);
       } catch (err) {
