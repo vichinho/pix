@@ -134,6 +134,23 @@ export class RiotApiClient {
     this.sleep = opts.sleepImpl ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
+  /**
+   * Clona el cliente con otro enrutado (platform/region) conservando la misma
+   * API key y configuración. Sirve para atender una petición cuya región difiere
+   * de la configurada por defecto (p. ej. el usuario elige LAS en la interfaz).
+   */
+  withRouting(platform: string, region: string): RiotApiClient {
+    return new RiotApiClient({
+      apiKey: this.apiKey,
+      platform,
+      region,
+      fetchImpl: this.fetchImpl,
+      maxRetries: this.maxRetries,
+      matchConcurrency: this.matchConcurrency,
+      sleepImpl: this.sleep,
+    });
+  }
+
   private async request<T>(host: string, path: string): Promise<T> {
     const url = `https://${host}${path}`;
     for (let attempt = 0; ; attempt += 1) {

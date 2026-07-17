@@ -63,6 +63,7 @@ const recommendationsQuerySchema = z.object({
   personalized: z.enum(['true', 'false']).optional(),
   gameName: z.string().min(1).optional(),
   tagLine: z.string().min(1).optional(),
+  platform: z.string().min(2).max(5).optional(),
 });
 
 const buildsQuerySchema = z.object({
@@ -75,7 +76,21 @@ const identityQuerySchema = z.object({
   tagLine: z.string().min(1).optional(),
   /** Máximo 50 para soportar la paginación del historial de partidas en cliente. */
   count: z.coerce.number().int().min(1).max(50).optional(),
+  /** Plataforma Riot (la1, la2, na1, euw1…) para enrutar summoner-v4/league-v4. */
+  platform: z.string().min(2).max(5).optional(),
 });
+
+/**
+ * Mapa plataforma → región de enrutado (account-v1 y match-v5 usan la región;
+ * summoner-v4 y league-v4 usan la plataforma). Permite que el usuario elija su
+ * servidor en la interfaz sin tener que tocar variables de entorno.
+ */
+const PLATFORM_TO_REGION: Record<string, string> = {
+  na1: 'americas', br1: 'americas', la1: 'americas', la2: 'americas',
+  euw1: 'europe', eun1: 'europe', tr1: 'europe', ru: 'europe',
+  kr: 'asia', jp1: 'asia',
+  oc1: 'sea', ph2: 'sea', sg2: 'sea', th2: 'sea', tw2: 'sea', vn2: 'sea',
+};
 
 /** Traduce un error de Riot API a un status HTTP y mensaje para el cliente local. */
 function riotErrorResponse(res: Response, err: unknown): void {
@@ -134,6 +149,28 @@ export function createServer(deps: ServerDeps = {}): Express {
   const getPersonalizedRecommendations = getRecentMatches
     ? new GetPersonalizedRecommendationsUseCase(championPool, getRecentMatches, champSelectReader)
     : null;
+
+  /**
+   * Devuelve los casos de uso de perfil/partidas enrutados a la plataforma pedida.
+   * Si no se especifica plataforma (o no hay Riot API), usa los de por defecto.
+   */
+  function routedRiot(platform: string | undefined): {
+    profile: typeof getPlayerProfile;
+    matches: typeof getRecentMatches;
+    stats: typeof getPlayerStats;
+  } {
+    if (!riotClient || !platform || platform === riotClient.platform) {
+      return { profile: getPlayerProfile, matches: getRecentMatches, stats: getPlayerStats };
+    }
+    const region = PLATFORM_TO_REGION[platform.toLowerCase()] ?? riotClient.region;
+    const client = riotClient.withRouting(platform.toLowerCase(), region);
+    const matches = new GetRecentMatchesUseCase(client);
+    return {
+      profile: new GetPlayerProfileUseCase(client),
+      matches,
+      stats: new GetPlayerStatsUseCase(matches),
+    };
+  }
 
   const identityStore = deps.identityStore ?? new MemoryIdentityStore();
 
@@ -276,7 +313,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
       return;
     }
-    const { role, limit, personalized, gameName, tagLine } = parsed.data;
+    const { role, limit, personalized, gameName, tagLine, platform } = parsed.data;
 
     // Ruta personalizada: combina el pool base con el historial del jugador.
     if (personalized === 'true') {
@@ -289,9 +326,15 @@ export function createServer(deps: ServerDeps = {}): Express {
         res.status(400).json({ error: 'identity_unavailable' });
         return;
       }
+      // Enruta el historial a la plataforma del jugador si difiere de la de por defecto.
+      const routedMatches = routedRiot(platform).matches;
+      const personalizedUseCase =
+        routedMatches && routedMatches !== getRecentMatches
+          ? new GetPersonalizedRecommendationsUseCase(championPool, routedMatches, champSelectReader)
+          : getPersonalizedRecommendations;
       try {
         res.json(
-          await getPersonalizedRecommendations.execute({
+          await personalizedUseCase.execute({
             identity,
             ...(role ? { role } : {}),
             ...(limit ? { limit } : {}),
@@ -410,7 +453,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       return;
     }
     try {
-      res.json(await getPlayerProfile.execute(identity));
+      res.json(await routedRiot(parsed.data.platform).profile!.execute(identity));
     } catch (err) {
       riotErrorResponse(res, err);
     }
@@ -432,7 +475,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       return;
     }
     try {
-      const matches = await getRecentMatches.execute(identity, parsed.data.count ?? 10);
+      const matches = await routedRiot(parsed.data.platform).matches!.execute(identity, parsed.data.count ?? 10);
       res.json({ matches });
     } catch (err) {
       riotErrorResponse(res, err);
@@ -455,7 +498,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       return;
     }
     try {
-      res.json(await getPlayerStats.execute(identity, parsed.data.count ?? 20));
+      res.json(await routedRiot(parsed.data.platform).stats!.execute(identity, parsed.data.count ?? 20));
     } catch (err) {
       riotErrorResponse(res, err);
     }

@@ -934,6 +934,12 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 /* ══════════════════════════════════════
    VINCULACIÓN DE CUENTA
 ══════════════════════════════════════ */
+.link-select {
+  width: 100%; margin-bottom: 0.5rem; background: var(--panel-3); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); padding: 0.5rem 0.7rem; color: var(--text);
+  font-size: 0.82rem; font-family: inherit; outline: none; cursor: pointer;
+}
+.link-select:focus { border-color: var(--accent); }
 .link-row { display: flex; gap: 0.5rem; }
 .link-row input {
   flex: 1; min-width: 0; background: var(--panel-3); border: 1px solid var(--border);

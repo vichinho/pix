@@ -55,6 +55,18 @@ describe('RiotApiClient', () => {
     expect(captured).toContain('/by-riot-id/a%20b/LAS');
     expect(captured).toContain('americas.api.riotgames.com');
   });
+
+  it('withRouting enruta summoner-v4 a la plataforma indicada', async () => {
+    const urls: string[] = [];
+    const fetchImpl: FetchLike = async (url) => {
+      urls.push(url);
+      return { status: 200, ok: true, text: async () => JSON.stringify({ puuid: 'p', id: 's', summonerLevel: 1, profileIconId: 1 }) };
+    };
+    // Cliente por defecto en la1; lo reenrutamos a la2 (LAS).
+    await client(fetchImpl).withRouting('la2', 'americas').getSummonerByPuuid('p');
+    expect(urls[0]).toContain('la2.api.riotgames.com');
+    expect(urls[0]).not.toContain('la1.api.riotgames.com');
+  });
 });
 
 describe('RiotApiClient rate limiting y cache', () => {

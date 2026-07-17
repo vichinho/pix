@@ -29,8 +29,8 @@ function getLinkedRiotId() {
     return v && v.gameName && v.tagLine ? v : null;
   } catch { return null; }
 }
-function setLinkedRiotId(gameName, tagLine) {
-  localStorage.setItem('riotId', JSON.stringify({ gameName, tagLine }));
+function setLinkedRiotId(gameName, tagLine, platform) {
+  localStorage.setItem('riotId', JSON.stringify({ gameName, tagLine, platform }));
 }
 function clearLinkedRiotId() {
   localStorage.removeItem('riotId');
@@ -38,8 +38,26 @@ function clearLinkedRiotId() {
 /** Sufijo de query con la identidad vinculada (si existe). */
 function riotIdQuery() {
   const id = getLinkedRiotId();
-  return id ? `&gameName=${encodeURIComponent(id.gameName)}&tagLine=${encodeURIComponent(id.tagLine)}` : '';
+  if (!id) return '';
+  let q = `&gameName=${encodeURIComponent(id.gameName)}&tagLine=${encodeURIComponent(id.tagLine)}`;
+  if (id.platform) q += `&platform=${encodeURIComponent(id.platform)}`;
+  return q;
 }
+
+/** Servidores de LoL: valor = plataforma Riot (para summoner-v4/league-v4). */
+const RIOT_PLATFORMS = [
+  { v: 'la2', label: 'LAS · Latinoamérica Sur' },
+  { v: 'la1', label: 'LAN · Latinoamérica Norte' },
+  { v: 'na1', label: 'NA · Norteamérica' },
+  { v: 'br1', label: 'BR · Brasil' },
+  { v: 'euw1', label: 'EUW · Europa Oeste' },
+  { v: 'eun1', label: 'EUNE · Europa Nórdica y Este' },
+  { v: 'kr', label: 'KR · Corea' },
+  { v: 'jp1', label: 'JP · Japón' },
+  { v: 'oc1', label: 'OCE · Oceanía' },
+  { v: 'tr1', label: 'TR · Turquía' },
+  { v: 'ru', label: 'RU · Rusia' },
+];
 
 const ROLE_ES = { TOP:'Top', JUNGLE:'Jungla', MIDDLE:'Mid', BOTTOM:'ADC', UTILITY:'Support', ARAM:'ARAM', UNKNOWN:'—' };
 
@@ -249,9 +267,14 @@ function stateEs(s) {
 function renderLinkForm() {
   const id = getLinkedRiotId();
   const prefill = id ? `${id.gameName}#${id.tagLine}` : '';
+  const sel = id?.platform || 'la2';
+  const options = RIOT_PLATFORMS.map(
+    (p) => `<option value="${p.v}"${p.v === sel ? ' selected' : ''}>${esc(p.label)}</option>`,
+  ).join('');
   return `
     <div class="link-form" style="padding:1.3rem">
       <div class="muted" style="margin-bottom:.6rem">Abre el cliente de LoL una vez, o vincula tu cuenta a mano:</div>
+      <select id="riotPlatform" class="link-select">${options}</select>
       <div class="link-row">
         <input id="riotIdInput" type="text" placeholder="Nombre#TAG (ej: Faker#KR1)" value="${esc(prefill)}"
           autocomplete="off" spellcheck="false" />
@@ -297,12 +320,13 @@ async function submitRiotId() {
   }
   const gameName = raw.slice(0, hash).trim();
   const tagLine = raw.slice(hash + 1).trim();
+  const platform = $('riotPlatform')?.value || 'la2';
   if (msg) { msg.textContent = 'Verificando…'; msg.className = 'link-msg'; }
 
   // Comprobamos contra la Riot API antes de guardar, para dar feedback claro.
-  const check = await api(`/api/player/profile?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}`);
+  const check = await api(`/api/player/profile?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&platform=${encodeURIComponent(platform)}`);
   if (check.ok && check.data) {
-    setLinkedRiotId(gameName, tagLine);
+    setLinkedRiotId(gameName, tagLine, platform);
     refreshRiotPanels();
   } else if (msg) {
     msg.innerHTML = riotErrorEs(check);
