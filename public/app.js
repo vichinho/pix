@@ -29,19 +29,34 @@ function getLinkedRiotId() {
     return v && v.gameName && v.tagLine ? v : null;
   } catch { return null; }
 }
-function setLinkedRiotId(gameName, tagLine, platform) {
-  localStorage.setItem('riotId', JSON.stringify({ gameName, tagLine, platform }));
+function setLinkedRiotId(gameName, tagLine) {
+  localStorage.setItem('riotId', JSON.stringify({ gameName, tagLine }));
 }
 function clearLinkedRiotId() {
   localStorage.removeItem('riotId');
 }
-/** Sufijo de query con la identidad vinculada (si existe). */
+/** La región/plataforma se guarda aparte, para enrutar aunque no haya Riot ID manual. */
+function getLinkedPlatform() {
+  return localStorage.getItem('riotPlatform') || 'la2';
+}
+function setLinkedPlatform(platform) {
+  if (platform) localStorage.setItem('riotPlatform', platform);
+}
+/**
+ * Sufijo de query para consultas Riot. Siempre enviamos la plataforma (para
+ * enrutar summoner-v4/league-v4 al servidor correcto). El Riot ID manual sólo se
+ * envía si el cliente de LoL está cerrado: si está abierto, el backend detecta la
+ * identidad EXACTA por LCU (evita fallos al reescribir nombres con caracteres
+ * especiales).
+ */
 function riotIdQuery() {
+  const parts = [`platform=${encodeURIComponent(getLinkedPlatform())}`];
   const id = getLinkedRiotId();
-  if (!id) return '';
-  let q = `&gameName=${encodeURIComponent(id.gameName)}&tagLine=${encodeURIComponent(id.tagLine)}`;
-  if (id.platform) q += `&platform=${encodeURIComponent(id.platform)}`;
-  return q;
+  if (!clientConnected && id) {
+    parts.push(`gameName=${encodeURIComponent(id.gameName)}`);
+    parts.push(`tagLine=${encodeURIComponent(id.tagLine)}`);
+  }
+  return `&${parts.join('&')}`;
 }
 
 /** Servidores de LoL: valor = plataforma Riot (para summoner-v4/league-v4). */
@@ -267,7 +282,7 @@ function stateEs(s) {
 function renderLinkForm() {
   const id = getLinkedRiotId();
   const prefill = id ? `${id.gameName}#${id.tagLine}` : '';
-  const sel = id?.platform || 'la2';
+  const sel = getLinkedPlatform();
   const options = RIOT_PLATFORMS.map(
     (p) => `<option value="${p.v}"${p.v === sel ? ' selected' : ''}>${esc(p.label)}</option>`,
   ).join('');
@@ -298,6 +313,12 @@ function wireLinkForm() {
     const input = $('riotIdInput');
     if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
   }
+  const platformSel = $('riotPlatform');
+  if (platformSel) {
+    // Guardamos la región al elegirla: así se enruta bien incluso con detección
+    // automática por LCU (sin Riot ID manual).
+    platformSel.addEventListener('change', () => setLinkedPlatform(platformSel.value));
+  }
   const relink = $('relinkBtn');
   if (relink) {
     relink.addEventListener('click', () => {
@@ -321,12 +342,15 @@ async function submitRiotId() {
   const gameName = raw.slice(0, hash).trim();
   const tagLine = raw.slice(hash + 1).trim();
   const platform = $('riotPlatform')?.value || 'la2';
+  setLinkedPlatform(platform);
   if (msg) { msg.textContent = 'Verificando…'; msg.className = 'link-msg'; }
 
   // Comprobamos contra la Riot API antes de guardar, para dar feedback claro.
   const check = await api(`/api/player/profile?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&platform=${encodeURIComponent(platform)}`);
   if (check.ok && check.data) {
-    setLinkedRiotId(gameName, tagLine, platform);
+    // Guardamos la forma CANÓNICA que devuelve Riot (con los caracteres exactos),
+    // no lo que se escribió, para que futuras cargas no fallen por tipeo.
+    setLinkedRiotId(check.data.gameName || gameName, check.data.tagLine || tagLine);
     refreshRiotPanels();
   } else if (msg) {
     msg.innerHTML = riotErrorEs(check);
@@ -338,7 +362,8 @@ async function submitRiotId() {
 function riotErrorEs(resp) {
   const code = resp.data?.error;
   if (resp.status === 404 || code === 'not_found')
-    return 'No se encontró esa cuenta. Revisa el Nombre#TAG (respeta mayúsculas y el tag correcto).';
+    return 'No se encontró esa cuenta. Revisa el servidor y el Nombre#TAG (el tag suele ser 3-5 letras/números, ej: #LAS o #1234). '
+      + 'Si tu nombre tiene caracteres especiales, lo más fiable es <b>abrir el cliente de LoL</b>: la app detectará tu cuenta automáticamente.';
   if (code === 'riot_api_key_invalid' || code === 'riot_api_key_forbidden_or_expired')
     return 'Tu clave de Riot API no es válida o expiró. Las claves de desarrollo caducan cada 24 h: '
       + 'genera una nueva en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a>, '
@@ -366,6 +391,9 @@ async function refreshRiotPanels() {
   $('riotBadge').className = 'pill on';
 
   if (prof.ok && prof.data) {
+    // Recordamos el Riot ID exacto detectado (por LCU o manual) para que siga
+    // funcionando aunque luego se cierre el cliente.
+    if (prof.data.gameName && prof.data.tagLine) setLinkedRiotId(prof.data.gameName, prof.data.tagLine);
     $('profileBody').innerHTML = renderProfile(prof.data) + renderRelinkLink();
     wireLinkForm();
     refreshStats();
@@ -422,7 +450,8 @@ const matchState = {
 const QUEUE_NAMES = {
   420: 'Clasif. Solo/Dúo', 440: 'Clasif. Flexible', 400: 'Normal Draft', 430: 'Normal',
   450: 'ARAM', 490: 'Normal Rápida', 480: 'Swiftplay', 700: 'Clash', 830: 'Co-op vs IA',
-  840: 'Co-op vs IA', 850: 'Co-op vs IA', 900: 'URF', 1700: 'Arena', 1900: 'URF',
+  840: 'Co-op vs IA', 850: 'Co-op vs IA', 900: 'URF', 1700: 'Arena', 1710: 'Arena', 1900: 'URF',
+  1300: 'Nexus Blitz', 1400: 'Libro de Hechizos', 2400: 'ARAM Mayhem', 2300: 'Mayhem',
 };
 const queueName = (id) => QUEUE_NAMES[id] || `Cola ${id}`;
 
