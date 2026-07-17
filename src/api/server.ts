@@ -577,6 +577,23 @@ export function createServer(deps: ServerDeps = {}): Express {
     }),
   );
 
+  // Sonda: prueba varias URLs/modos de u.gg y reporta cuál responde 200.
+  app.get(
+    '/api/builds/probe-ugg',
+    wrap(async (req: Request, res: Response) => {
+      if (!uggProvider) {
+        res.status(503).json({ error: 'ugg_disabled' });
+        return;
+      }
+      const parsed = buildsQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+        return;
+      }
+      res.json(await uggProvider.probe(parsed.data.championId));
+    }),
+  );
+
   // Rutas planificadas en la especificación, aún no implementadas.
   const notImplemented = (name: string) => (_req: Request, res: Response) => {
     res.status(501).json({ error: 'not_implemented', endpoint: name });

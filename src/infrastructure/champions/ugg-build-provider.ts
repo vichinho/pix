@@ -141,6 +141,44 @@ export class UggBuildProvider implements BuildProvider {
   }
 
   /**
+   * Sonda de diagnóstico: prueba varias combinaciones de modo/formato de URL y
+   * reporta el estado HTTP de cada una, para descubrir el formato correcto sin
+   * redeploys. También devuelve el JSON crudo de la primera que responda 200.
+   */
+  async probe(championId: number): Promise<{
+    patch: string | null;
+    version: string | null;
+    attempts: { url: string; status: number | string }[];
+    firstOkUrl: string | null;
+    raw: unknown | null;
+  }> {
+    const ver = await this.resolveVersion();
+    const attempts: { url: string; status: number | string }[] = [];
+    let firstOkUrl: string | null = null;
+    let raw: unknown | null = null;
+    if (!ver) return { patch: null, version: null, attempts, firstOkUrl, raw };
+
+    const primary = ver.version.split('.').slice(0, 2).join('.');
+    const modes = ['ranked_solo_5x5', 'aram', 'normal_aram', 'ranked_aram'];
+    const urls = modes.map(
+      (m) => `https://stats2.u.gg/lol/${primary}/overview/${ver.patch}/${m}/${championId}/${ver.version}.json`,
+    );
+    for (const url of urls) {
+      try {
+        const res = await this.get(url);
+        attempts.push({ url, status: res.status });
+        if (res.ok && !firstOkUrl) {
+          firstOkUrl = url;
+          raw = (await res.json()) as unknown;
+        }
+      } catch (err) {
+        attempts.push({ url, status: String(err) });
+      }
+    }
+    return { patch: ver.patch, version: ver.version, attempts, firstOkUrl, raw };
+  }
+
+  /**
    * Diagnóstico completo para calibrar el parser con datos reales: URL probada,
    * parche/versión resueltos, estado HTTP, JSON crudo y la build parseada.
    */
