@@ -17,6 +17,30 @@ async function api(path) {
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// --- Identidad Riot vinculada manualmente -------------------------------
+// Si el cliente de LoL no está abierto, el usuario puede escribir su Riot ID
+// (Nombre#TAG) para vincular la cuenta vía Riot API. Se guarda en localStorage
+// y se envía en cada consulta de perfil/stats/partidas.
+function getLinkedRiotId() {
+  try {
+    const raw = localStorage.getItem('riotId');
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return v && v.gameName && v.tagLine ? v : null;
+  } catch { return null; }
+}
+function setLinkedRiotId(gameName, tagLine) {
+  localStorage.setItem('riotId', JSON.stringify({ gameName, tagLine }));
+}
+function clearLinkedRiotId() {
+  localStorage.removeItem('riotId');
+}
+/** Sufijo de query con la identidad vinculada (si existe). */
+function riotIdQuery() {
+  const id = getLinkedRiotId();
+  return id ? `&gameName=${encodeURIComponent(id.gameName)}&tagLine=${encodeURIComponent(id.tagLine)}` : '';
+}
+
 const ROLE_ES = { TOP:'Top', JUNGLE:'Jungla', MIDDLE:'Mid', BOTTOM:'ADC', UTILITY:'Support', ARAM:'ARAM', UNKNOWN:'—' };
 
 // --- Catálogo -----------------------------------------------------------
@@ -220,9 +244,76 @@ function stateEs(s) {
     READY_CHECK:'aceptar', CHAMP_SELECT:'champ select', IN_GAME:'en partida', POST_GAME:'post-partida' }[s] || s || '—');
 }
 
+// --- Vinculación manual de cuenta ---------------------------------------
+/** Formulario para escribir el Riot ID (Nombre#TAG) cuando no hay cuenta vinculada. */
+function renderLinkForm() {
+  const id = getLinkedRiotId();
+  const prefill = id ? `${id.gameName}#${id.tagLine}` : '';
+  return `
+    <div class="link-form" style="padding:1.3rem">
+      <div class="muted" style="margin-bottom:.6rem">Abre el cliente de LoL una vez, o vincula tu cuenta a mano:</div>
+      <div class="link-row">
+        <input id="riotIdInput" type="text" placeholder="Nombre#TAG (ej: Faker#KR1)" value="${esc(prefill)}"
+          autocomplete="off" spellcheck="false" />
+        <button id="riotIdBtn" type="button">Vincular</button>
+      </div>
+      <div id="riotIdMsg" class="link-msg"></div>
+    </div>`;
+}
+
+/** Enlace pequeño para revincular/cambiar la cuenta ya conectada. */
+function renderRelinkLink() {
+  return `<div class="relink"><button id="relinkBtn" type="button" class="linklike">Cambiar cuenta</button></div>`;
+}
+
+/** Conecta los eventos del formulario/enlace de vinculación tras renderizar. */
+function wireLinkForm() {
+  const btn = $('riotIdBtn');
+  if (btn) {
+    const submit = () => submitRiotId();
+    btn.addEventListener('click', submit);
+    const input = $('riotIdInput');
+    if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  }
+  const relink = $('relinkBtn');
+  if (relink) {
+    relink.addEventListener('click', () => {
+      clearLinkedRiotId();
+      $('profileBody').innerHTML = renderLinkForm();
+      wireLinkForm();
+    });
+  }
+}
+
+/** Valida y guarda el Riot ID escrito, luego recarga los paneles. */
+async function submitRiotId() {
+  const input = $('riotIdInput');
+  const msg = $('riotIdMsg');
+  const raw = (input?.value || '').trim();
+  const hash = raw.lastIndexOf('#');
+  if (hash <= 0 || hash === raw.length - 1) {
+    if (msg) { msg.textContent = 'Formato: Nombre#TAG (ej: Faker#KR1)'; msg.className = 'link-msg err'; }
+    return;
+  }
+  const gameName = raw.slice(0, hash).trim();
+  const tagLine = raw.slice(hash + 1).trim();
+  if (msg) { msg.textContent = 'Verificando…'; msg.className = 'link-msg'; }
+
+  // Comprobamos contra la Riot API antes de guardar, para dar feedback claro.
+  const check = await api(`/api/player/profile?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}`);
+  if (check.ok && check.data) {
+    setLinkedRiotId(gameName, tagLine);
+    refreshRiotPanels();
+  } else if (msg) {
+    const reason = check.status === 404 ? 'No se encontró esa cuenta.' : (check.data?.error || `Error ${check.status}`);
+    msg.textContent = `No se pudo vincular: ${esc(reason)}`;
+    msg.className = 'link-msg err';
+  }
+}
+
 // --- Perfil / stats / partidas -----------------------------------------
 async function refreshRiotPanels() {
-  const prof = await api('/api/player/profile');
+  const prof = await api(`/api/player/profile?_=1${riotIdQuery()}`);
   if (prof.status === 503) {
     riotConfigured = false;
     $('riotBadge').textContent = 'Riot API off';
@@ -238,14 +329,13 @@ async function refreshRiotPanels() {
   $('riotBadge').className = 'pill on';
 
   if (prof.ok && prof.data) {
-    $('profileBody').innerHTML = renderProfile(prof.data);
+    $('profileBody').innerHTML = renderProfile(prof.data) + renderRelinkLink();
+    wireLinkForm();
     refreshStats();
     refreshMatches();
   } else if (prof.status === 400) {
-    $('profileBody').innerHTML = `
-      <div style="padding:1.4rem 1.3rem">
-        <span class="muted">Abre el cliente de LoL una vez para vincular tu cuenta.</span>
-      </div>`;
+    $('profileBody').innerHTML = renderLinkForm();
+    wireLinkForm();
     $('statsBody').innerHTML = '<span class="muted">—</span>';
     matchState.all = [];
     renderMatchPage();
@@ -255,7 +345,7 @@ async function refreshRiotPanels() {
 }
 
 async function refreshStats() {
-  const { ok, data, status } = await api('/api/player/stats?count=20');
+  const { ok, data, status } = await api(`/api/player/stats?count=20${riotIdQuery()}`);
   if (!ok) { $('statsBody').innerHTML = `<span class="err">${esc(data?.error || status)}</span>`; return; }
   const wr = Math.round((data.winRate || 0) * 100);
   const top = (data.byChampion || []).slice(0, 6);
@@ -443,7 +533,7 @@ async function refreshMatches() {
   body.innerHTML = '<span class="muted">Cargando partidas…</span>';
   $('matchPagination').hidden = true;
 
-  const { ok, data, status } = await api('/api/player/matches?count=50');
+  const { ok, data, status } = await api(`/api/player/matches?count=50${riotIdQuery()}`);
   if (!ok) {
     body.innerHTML = `<span class="err">${esc(data?.error || status)}</span>`;
     return;
@@ -531,7 +621,7 @@ async function refreshChampSelect() {
   }
   const s = data.session;
   if (s.selectedChampionId) { lastPickedChampionId = s.selectedChampionId; lastPickedRole = s.assignedRole; }
-  const rec = await api(`/api/recommendations?role=${s.assignedRole}&limit=5${riotConfigured ? '&personalized=true' : ''}`);
+  const rec = await api(`/api/recommendations?role=${s.assignedRole}&limit=5${riotConfigured ? '&personalized=true' + riotIdQuery() : ''}`);
   let recHtml = '<span class="muted">—</span>';
   if (rec.ok) { const tmp = document.createElement('div'); renderRecommendations(tmp, rec.data); recHtml = tmp.innerHTML; }
   let pickHtml = '';

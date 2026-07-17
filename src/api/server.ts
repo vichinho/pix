@@ -148,9 +148,11 @@ export function createServer(deps: ServerDeps = {}): Express {
     tagLine: string | undefined,
   ): Promise<PlayerIdentity | null> {
     if (gameName && tagLine) {
-      const identity = { gameName, tagLine };
-      identityStore.set(identity);
-      return identity;
+      // No persistimos la identidad explícita aquí: aún no está verificada contra
+      // la Riot API, y persistir un Riot ID mal escrito dejaría al usuario atascado
+      // en un 404 en cargas posteriores. La persistencia del enlace manual la
+      // gestiona el frontend (localStorage); aquí sólo la usamos para esta petición.
+      return { gameName, tagLine };
     }
     try {
       const summoner = await detector.getCurrentSummoner();
