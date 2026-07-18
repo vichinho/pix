@@ -901,37 +901,14 @@ $('matchQueueFilter').addEventListener('change', (e) => {
 initMatchClicks();
 
 // --- Consejos y combos por campeón --------------------------------------
-// Clave: id de Data Dragon en minúsculas. Valor: lista de consejos/combos.
-const CHAMPION_TIPS = {
-  ahri: ['Combo: E (encanto) → Q → R para acercarte → W. El encanto es tu inicio, no lo malgastes.', 'Usa las 3 cargas de R para reposicionarte en peleas y esquivar habilidades.', 'Q vuelve haciendo daño mágico: colócate para que atraviese al enemigo dos veces.'],
-  zed: ['Combo: R → E → Q → W de vuelta. La R marca daño según el % que hagas mientras dura.', 'Usa W (sombra) para poke con Q sin exponerte; guarda la 2.ª carga para escapar.', 'Céntrate en asesinar al carry y sal con la sombra.'],
-  yasuo: ['Sube Q para el tornado; con 2 puntos en E te mueves rápido entre súbditos.', 'Combo: E→Q (tornado) → R tras un knock-up aliado o tu propio tornado.', 'Guarda W (muro) para bloquear habilidades a distancia clave (ults, ADCs).'],
-  yone: ['Acumula Q dos veces para el 3.º golpe con empuje.', 'Usa R para engage o para volver a tu cuerpo con E si estás en riesgo.', 'Alterna forma AD/AP según sus resistencias, pero AD crítico es lo estándar.'],
-  annie: ['Cuenta tus pasivas: al 4.º hechizo el siguiente aturde. Prepara el stun antes del all-in.', 'Combo: (pasiva lista) R (Tibbers, aturde) → Q → W. Devastador en teamfight.', 'W es cono: acierta a varios en ARAM/teamfights.'],
-  lux: ['Combo: Q (raíz) → E → R. La Q inmoviliza para asegurar el resto.', 'La pasiva marca al enemigo: un autoataque tras un hechizo hace daño extra.', 'E deja una zona: úsala para zonificar o rematar con detonación.'],
-  jinx: ['Con cada kill/asistencia ganas velocidad (pasiva): agrúpate para snowball.', 'Cambia entre minigun (peleas) y cohetes (poke/wave y AoE).', 'Coloca trampas (E) en tu posición para peel; R remata a distancia.'],
-  caitlyn: ['Tu rango es el mayor: castiga con Q y autos desde lejos.', 'Combo con trampa (W) + Q: si pisan la trampa, tu siguiente auto es potenciado.', 'Coloca trampas en entradas/objetivos; R para rematar aislados.'],
-  thresh: ['Combo: Q (gancho) → E (empuje o atracción) → autos con pasiva.', 'La linterna (W) salva aliados: lánzala cerca de un aliado en apuros.', 'Recoge almas (pasiva) golpeando con habilidades para escalar armadura y AP.'],
-  leona: ['Combo: E (embate) → Q (aturde) → R. Aguanta con Aftershock al iniciar.', 'Tu pasiva marca: tras tu CC, tu equipo hace daño extra al objetivo.', 'Inicia solo si tu equipo puede seguirte; si no, espera.'],
-  malphite: ['Acumula armadura: tu Q y autos pegan más con más armadura.', 'Guarda R para un buen engage sobre varios enemigos agrupados.', 'Combo: R (engage) → E → Q. Build AP hace mucho burst con la R.'],
-  katarina: ['Recoges dagas del suelo: pisarlas las detona (daño AoE). Coloca E cerca de una daga.', 'Combo: E (salto) → W (daga) → pisar daga → R. Resetea E con kills/asistencias.', 'Entra cuando el enemigo haya gastado su CC dura (te interrumpe la R).'],
-  brand: ['Encadena la pasiva: 3 stacks explotan haciendo daño AoE.', 'Combo: W → Q (si está en llamas, Q aturde) → E para propagar.', 'R rebota entre enemigos cercanos: brilla en grupos apretados (ARAM).'],
-  darius: ['Golpea con el borde exterior de Q para el daño máximo y curarte.', 'Apila la pasiva (sangrado) hasta 5 y remata con R (daño según stacks).', 'E (tirón) para acercar y cancelar dashes; luego W para ralentizar.'],
-  aatrox: ['Acierta el centro (3.er Q) para el daño y knock-up máximos.', 'Combo: Q1 → W (atrae) → Q2 borde → Q3 centro. Usa E para reposicionar cada Q.', 'La R te cura y agranda: úsala para pelear, no solo para escapar.'],
-  leesin: ['Combo insignia: Q → Q (2.º) → R (patada) hacia tu equipo o para desplazar.', 'W a un aliado/ward para reposicionar (ward-hop).', 'Eres fuerte temprano: aprovecha tu poder de early para invadir y gankear.'],
-  masteryi: ['Usa Q (Alpha Strike) para hacer daño y volverte intargetable un instante (esquiva CC/habilidades).', 'W te cura y limpia ralentizaciones; actívalo en el momento justo.', 'Entra en peleas cuando el enemigo haya gastado su CC — el CC es tu perdición.'],
-  soraka: ['Tu Q te cura a ti y potencia la siguiente W; W gasta tu vida, cúrate con Q antes.', 'R (Deseo) cura a todo el equipo globalmente: úsala para salvar peleas a distancia.', 'Acierta Q para ralentizar y sostener tu maná/vida.'],
-  seraphine: ['Tu 3.er hechizo (pasiva) se duplica: ordena el combo para aprovecharlo.', 'R crece con cada aliado/enemigo que atraviesa: lánzala desde atrás para máximo alcance y CC.', 'Q para poke, W para curar/escudar, E para CC de zona.'],
-  kaisa: ['Evoluciona Q primero (más misiles). Marca con habilidades y remata con pasiva.', 'Usa R para saltar hacia un objetivo marcado por tu pasiva (¡también a un aliado cerca!).', 'On-hit: Kraken + Runaan + Guinsoo escala brutal en late.'],
-  vayne: ['Cada 3.er golpe a un objetivo hace daño verdadero (W): mantente pegado.', 'Q (voltereta) resetea el temporizador de autoataque y te da invisibilidad breve con R.', 'Empuja con E a los enemigos contra muros para aturdir.'],
-};
+// Los datos viven en champion-tips.js (window.CHAMPION_TIPS), cargado antes.
 
 /** Consejos del campeón por su id de Data Dragon, o null. */
 function champTipsFor(id) {
   const e = catalogById.get(Number(id));
   if (!e) return null;
   const dd = e.image.replace(/\.png$/, '').toLowerCase();
-  return CHAMPION_TIPS[dd] || null;
+  return (window.CHAMPION_TIPS || {})[dd] || null;
 }
 
 /** Bloque de consejos y combos del campeón (si hay curados). */
