@@ -77,6 +77,26 @@ npm test
 
 Luego abre el **dashboard** en el navegador: **http://127.0.0.1:3535/**
 
+### App de escritorio (Electron)
+
+Para usar PIX como una app nativa (doble clic, sin navegador ni terminal) —ideal
+para compartir con amigos— hay un envoltorio de Electron que arranca el backend
+en un puerto local libre y abre una ventana propia:
+
+```bash
+npm run electron:dev          # compila y abre la app en modo desarrollo
+npm run electron:build        # genera un instalador para tu sistema operativo
+npm run electron:build:win    # fuerza el instalador de Windows (NSIS)
+npm run electron:build:mac    # DMG de macOS
+npm run electron:build:linux  # AppImage de Linux
+```
+
+Los instaladores quedan en `release/`. La clave de la Riot API se pega desde
+**Ajustes** dentro de la propia app (no hace falta `.env`) y los datos del usuario
+(ajustes, identidad, caché de partidas) se guardan en la carpeta de datos del
+sistema operativo, no dentro del paquete, para que sobrevivan a las
+actualizaciones.
+
 La UI (dark theme, sin paso de build) se sirve desde `public/` y consume la API local:
 muestra estado del cliente, perfil, historial y estadísticas. El panel de contexto es
 **dinámico**: en champ select muestra los campeones recomendados para tu línea y las
@@ -227,6 +247,7 @@ docs/                 # Arquitectura y decisiones
 
 ## Próximos pasos
 
-Según el roadmap de la especificación: integrar Riot API (perfil + historial),
-lectura de la sesión de champion select, motor de recomendaciones por reglas y
-proveedor de builds con fallback local.
+Integrar Riot API (perfil + historial), lectura de la sesión de champion select,
+motor de recomendaciones por reglas y proveedor de builds con fallback local — ya
+implementados. Pendiente de cara a publicar: internacionalización (ES/EN), firma
+de código de los instaladores y auto-actualización.
