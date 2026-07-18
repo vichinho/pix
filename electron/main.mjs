@@ -32,15 +32,26 @@ async function boot() {
 }
 
 function createWindow(port) {
+  // Barra de título integrada al tema oscuro: ocultamos la nativa y pintamos la
+  // zona de los botones de ventana con el color de la app (Windows/macOS).
+  const integratedTitleBar =
+    process.platform === 'win32' || process.platform === 'darwin';
+
   const win = new BrowserWindow({
     width: 1180,
     height: 820,
     minWidth: 900,
     minHeight: 640,
-    backgroundColor: '#1A1033',
+    backgroundColor: '#0a0b0f',
     title: 'PIX',
     icon: join(here, '..', 'public', 'pix-icon.png'),
     autoHideMenuBar: true,
+    ...(integratedTitleBar
+      ? {
+          titleBarStyle: 'hidden',
+          titleBarOverlay: { color: '#0a0b0f', symbolColor: '#e8eaf0', height: 52 },
+        }
+      : {}),
     webPreferences: {
       // La UI es una web estática servida localmente; no necesita acceso a Node.
       nodeIntegration: false,

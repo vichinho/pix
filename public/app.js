@@ -6,6 +6,12 @@ const $ = (id) => document.getElementById(id);
 /** Atajo de traducción (i18n.js). El español es la clave y el fallback. */
 const T = (s, params) => window.I18N.t(s, params);
 
+// En la app de escritorio (Electron) integramos la barra de título: marcamos el
+// documento para activar las zonas arrastrables y el hueco de los botones.
+if (navigator.userAgent.includes('Electron')) {
+  document.documentElement.classList.add('electron');
+}
+
 async function api(path, options) {
   try {
     const res = await fetch(path, options);
@@ -352,6 +358,8 @@ async function refreshStatus() {
     badge.textContent = T('Desconectado');
     badge.className = 'pill off';
   }
+  const dot = $('settingsDot');
+  if (dot) dot.classList.toggle('on', clientConnected);
   return data;
 }
 
@@ -1549,6 +1557,37 @@ function setupLangSwitch() {
   });
 }
 
+/** Conecta el botón de ajustes (estados + reconfigurar clave). */
+function setupSettings() {
+  const btn = $('settingsBtn');
+  const panel = $('settingsPanel');
+  if (!btn || !panel) return;
+  const close = () => {
+    panel.hidden = true;
+    btn.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  const open = () => {
+    panel.hidden = false;
+    btn.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.hidden ? open() : close();
+  });
+  document.addEventListener('click', (e) => {
+    if (!panel.hidden && !panel.contains(e.target) && !btn.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  const rk = $('reconfigKeyBtn');
+  if (rk) rk.addEventListener('click', () => {
+    close();
+    $('profileBody').innerHTML = renderApiKeyForm();
+    wireApiKeyForm();
+  });
+}
+
 // Arranque: primero conocemos el estado del cliente, luego perfil y contexto,
 // así el perfil sabe si mostrar "última sesión".
 async function boot() {
@@ -1557,6 +1596,7 @@ async function boot() {
   window.I18N.applyStatic(document);
   markLangButton();
   setupLangSwitch();
+  setupSettings();
   await loadCatalog();
   await refreshStatus();
   refreshRiotPanels();

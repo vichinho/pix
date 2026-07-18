@@ -20,6 +20,9 @@
     'Desconectado': 'Disconnected',
     'Riot API off': 'Riot API off',
     'Idioma': 'Language',
+    'Ajustes': 'Settings',
+    'Estado del cliente': 'Client status',
+    'Configurar clave de Riot API': 'Configure Riot API key',
 
     // — Estados del cliente (stateEs) —
     'desconectado': 'disconnected',

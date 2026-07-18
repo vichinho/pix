@@ -221,8 +221,91 @@ body {
   }
 }
 
-.topbar-right { display: flex; align-items: center; gap: 0.75rem; }
+.topbar-right { display: flex; align-items: center; gap: 0.6rem; }
 .status-group { display: flex; gap: 0.4rem; }
+
+/* ── Botón de ajustes + panel ── */
+.settings-wrap { position: relative; }
+.icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+.icon-btn:hover { color: var(--text); border-color: var(--border); background: var(--panel-3); }
+.icon-btn.open { color: var(--accent); border-color: rgba(201,168,76,0.35); }
+.settings-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+  border: 2px solid var(--bg);
+  transition: background var(--transition);
+}
+.settings-dot.on { background: var(--win); box-shadow: 0 0 5px var(--win-soft); }
+
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  padding: 0.5rem;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.settings-panel[hidden] { display: none; }
+.sp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+}
+.sp-label { font-size: 0.78rem; color: var(--muted); }
+.sp-sep { height: 1px; background: var(--border-soft); margin: 0.3rem 0.2rem; }
+.sp-action {
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.sp-action:hover { background: var(--panel-3); color: var(--accent); }
+
+/* ── Integración con la barra de título nativa (solo app de escritorio) ── */
+.electron .topbar {
+  -webkit-app-region: drag;
+  /* deja espacio a la derecha para los botones de ventana (min/max/cerrar) */
+  padding-right: 148px;
+}
+.electron .brand,
+.electron .topbar-right,
+.electron .lang-switch,
+.electron .icon-btn,
+.electron .settings-panel,
+.electron .pill { -webkit-app-region: no-drag; }
 
 /* ── Pills ── */
 .pill {
