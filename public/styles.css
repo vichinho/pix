@@ -1061,3 +1061,23 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 .apply-runes.ok { background: var(--win-soft); color: var(--win); }
 .apply-runes.err { background: var(--loss-soft); color: var(--loss); }
 .apply-runes .ar-ico { font-size: 0.9rem; }
+
+/* ══════════════════════════════════════
+   MAESTRÍA DE CAMPEONES + ACCESO RÁPIDO
+══════════════════════════════════════ */
+.mastery-row, .qa-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.mastery-tile {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  width: 48px; padding-bottom: 2px;
+}
+.mastery-tile img { width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--border); }
+.mastery-tile.clickable { cursor: pointer; }
+.mastery-tile.clickable:hover img { border-color: var(--accent); }
+.mastery-tile .m-lvl {
+  position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+  font-size: 0.56rem; font-weight: 700; color: #16130a; background: var(--accent);
+  border-radius: 99px; padding: 0 0.28rem; line-height: 1.3;
+}
+.mastery-tile .m-pts { font-size: 0.6rem; color: var(--muted); margin-top: 0.32rem; }
+.quick-access { margin-bottom: 0.85rem; }
+.qa-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); margin-bottom: 0.4rem; }

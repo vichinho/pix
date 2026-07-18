@@ -9,6 +9,7 @@ import { GetAramAnalysisUseCase } from '../application/get-aram-analysis.js';
 import { GetPlayerProfileUseCase, type PlayerIdentity } from '../application/get-player-profile.js';
 import { GetRecentMatchesUseCase } from '../application/get-recent-matches.js';
 import { GetPlayerStatsUseCase } from '../application/get-player-stats.js';
+import { GetChampionMasteryUseCase } from '../application/get-champion-mastery.js';
 import { GetPersonalizedRecommendationsUseCase } from '../application/get-personalized-recommendations.js';
 import { GetChampionBuildUseCase } from '../application/get-champion-build.js';
 import { enrichBuild, bareEnrichedBuild } from '../application/enrich-build.js';
@@ -165,6 +166,7 @@ export function createServer(deps: ServerDeps = {}): Express {
   const getPersonalizedRecommendations = getRecentMatches
     ? new GetPersonalizedRecommendationsUseCase(championPool, getRecentMatches, champSelectReader)
     : null;
+  const getChampionMastery = riotClient ? new GetChampionMasteryUseCase(riotClient) : null;
 
   /**
    * Devuelve los casos de uso de perfil/partidas enrutados a la plataforma pedida.
@@ -173,17 +175,16 @@ export function createServer(deps: ServerDeps = {}): Express {
   // Casos de uso por plataforma, memorizados: así el cliente enrutado (y sus
   // cachés de cuenta y de partidas) persiste entre peticiones en vez de crearse
   // de cero cada vez (clave cuando el usuario siempre envía platform=la2).
-  const routedCache = new Map<
-    string,
-    { profile: typeof getPlayerProfile; matches: typeof getRecentMatches; stats: typeof getPlayerStats }
-  >();
-  function routedRiot(platform: string | undefined): {
+  type RoutedBundle = {
     profile: typeof getPlayerProfile;
     matches: typeof getRecentMatches;
     stats: typeof getPlayerStats;
-  } {
+    mastery: typeof getChampionMastery;
+  };
+  const routedCache = new Map<string, RoutedBundle>();
+  function routedRiot(platform: string | undefined): RoutedBundle {
     if (!riotClient || !platform || platform.toLowerCase() === riotClient.platform) {
-      return { profile: getPlayerProfile, matches: getRecentMatches, stats: getPlayerStats };
+      return { profile: getPlayerProfile, matches: getRecentMatches, stats: getPlayerStats, mastery: getChampionMastery };
     }
     const key = platform.toLowerCase();
     const hit = routedCache.get(key);
@@ -191,10 +192,11 @@ export function createServer(deps: ServerDeps = {}): Express {
     const region = PLATFORM_TO_REGION[key] ?? riotClient.region;
     const client = riotClient.withRouting(key, region);
     const matches = new GetRecentMatchesUseCase(client);
-    const bundle = {
+    const bundle: RoutedBundle = {
       profile: new GetPlayerProfileUseCase(client),
       matches,
       stats: new GetPlayerStatsUseCase(matches),
+      mastery: new GetChampionMasteryUseCase(client),
     };
     routedCache.set(key, bundle);
     return bundle;
@@ -535,6 +537,29 @@ export function createServer(deps: ServerDeps = {}): Express {
     }
     try {
       res.json(await routedRiot(parsed.data.platform).stats!.execute(identity, parsed.data.count ?? 20));
+    } catch (err) {
+      riotErrorResponse(res, err);
+    }
+  });
+
+  app.get('/api/player/mastery', async (req: Request, res: Response) => {
+    if (!getChampionMastery) {
+      res.status(503).json({ error: 'riot_not_configured' });
+      return;
+    }
+    const parsed = identityQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
+    if (!identity) {
+      res.status(400).json({ error: 'identity_unavailable' });
+      return;
+    }
+    try {
+      const mastery = await routedRiot(parsed.data.platform).mastery!.execute(identity, parsed.data.count ?? 8);
+      res.json({ mastery });
     } catch (err) {
       riotErrorResponse(res, err);
     }

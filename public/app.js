@@ -438,6 +438,7 @@ async function refreshRiotPanels() {
     // Cargamos el historial (progresivo) y calculamos las estadísticas del mismo
     // set de partidas (antes se pedían aparte, duplicando decenas de peticiones).
     await refreshMatches();
+    refreshMastery();
   } else if (prof.status === 400 && prof.data?.error === 'identity_unavailable') {
     $('profileBody').innerHTML = renderLinkForm();
     wireLinkForm();
@@ -496,6 +497,42 @@ function renderStatsFromMatches() {
   el.innerHTML = `
     <div class="summary"><span class="big ${wr >= 50 ? 'win' : 'loss'}">${wr}%</span><span>WR · ${wins}V ${losses}D · ${total} partidas</span></div>
     <table><thead><tr><th>Campeón</th><th>P</th><th>WR</th><th>KDA</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// --- Maestría de campeones ----------------------------------------------
+let masteryList = [];
+
+/** Puntos de maestría abreviados (12345 → "12.3k"). */
+function fmtPoints(n) {
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k`;
+  return `${n}`;
+}
+
+/** Ficha de maestría (icono + nivel + puntos). */
+function masteryTile(m, clickable) {
+  const url = champIconUrl(m.championId);
+  const img = url ? `<img src="${esc(url)}" alt="${esc(champName(m.championId))}" loading="lazy"/>` : '';
+  const tip = `${champName(m.championId)} · Maestría ${m.level} · ${m.points.toLocaleString('es')} pts`;
+  const attrs = clickable ? `data-cid="${esc(m.championId)}"` : '';
+  const cls = clickable ? 'mastery-tile clickable' : 'mastery-tile';
+  return `<div class="${cls}" ${attrs} title="${esc(tip)}">${img}<span class="m-lvl">M${esc(m.level)}</span><span class="m-pts">${esc(fmtPoints(m.points))}</span></div>`;
+}
+
+async function refreshMastery() {
+  const card = $('masteryCard');
+  const body = $('masteryBody');
+  const { ok, data } = await api(`/api/player/mastery?count=12${riotIdQuery()}`);
+  if (!ok || !Array.isArray(data?.mastery) || !data.mastery.length) {
+    masteryList = [];
+    if (card) card.hidden = true;
+    return;
+  }
+  masteryList = data.mastery;
+  if (card) card.hidden = false;
+  if (body) body.innerHTML = `<div class="mastery-row">${data.mastery.slice(0, 8).map((m) => masteryTile(m, false)).join('')}</div>`;
+  // Si el explorador ya está visible y aún no tiene el acceso rápido, lo añade
+  // una sola vez (sin re-render en refrescos posteriores para no molestar).
+  if (contextMode === 'idle' && !document.querySelector('.quick-access')) renderIdleContext();
 }
 
 // ── Historial de partidas con paginación ────────────────────────────────
@@ -840,8 +877,16 @@ function renderIdleContext() {
     const img = url ? `<img src="${url}" alt="${esc(c.name)}" loading="lazy"/>` : '';
     return `<button class="champ-tile" data-cid="${esc(c.id)}" title="${esc(c.name)}" data-name="${esc(c.name.toLowerCase())}">${img}<span>${esc(c.name)}</span></button>`;
   }).join('');
+  // Acceso rápido: tus campeones con más maestría (si hay datos de Riot).
+  const quick = masteryList.length
+    ? `<div class="quick-access">
+        <div class="qa-label">Tus campeones (maestría)</div>
+        <div class="qa-row">${masteryList.slice(0, 8).map((m) => masteryTile(m, true)).join('')}</div>
+      </div>`
+    : '';
   $('contextBody').innerHTML = `
     <div class="muted" style="margin-bottom:.6rem">No estás en partida. Busca cualquier campeón para ver su build, runas y orden de subida:</div>
+    ${quick}
     <input id="champSearch" class="champ-search" type="text" placeholder="Buscar campeón…" autocomplete="off" spellcheck="false"/>
     <div id="champGrid" class="champ-grid">${tiles}</div>
     <div id="champBuildView" class="champ-build-view"></div>`;
@@ -856,6 +901,11 @@ function renderIdleContext() {
   });
   grid.addEventListener('click', (e) => {
     const tile = e.target.closest('.champ-tile');
+    if (tile) showIdleBuild(Number(tile.dataset.cid));
+  });
+  const qaRow = $('contextBody').querySelector('.qa-row');
+  if (qaRow) qaRow.addEventListener('click', (e) => {
+    const tile = e.target.closest('.mastery-tile.clickable');
     if (tile) showIdleBuild(Number(tile.dataset.cid));
   });
 }

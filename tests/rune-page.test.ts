@@ -17,7 +17,7 @@ function recordingConnector(calls: Call[], current: unknown): LcuConnector {
   } as unknown as LcuConnector;
 }
 
-const CREDS = { pid: 1, port: 1, password: 'x', protocol: 'https' as const };
+const CREDS = { processName: 'LeagueClient', pid: 1, port: 1, password: 'x', protocol: 'https' as const };
 
 describe('RunePageWriter', () => {
   it('borra la página actual editable y crea la nueva como activa', async () => {

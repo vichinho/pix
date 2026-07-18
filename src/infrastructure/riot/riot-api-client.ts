@@ -29,6 +29,13 @@ export interface RiotSummonerDto {
   profileIconId: number;
 }
 
+/** Maestría de campeón (champion-mastery-v4). */
+export interface RiotChampionMasteryDto {
+  championId: number;
+  championLevel: number;
+  championPoints: number;
+}
+
 /** Entrada de liga (league-v4 entry). */
 export interface RiotLeagueEntryDto {
   queueType: string;   // RANKED_SOLO_5x5 | RANKED_FLEX_SR | ...
@@ -238,6 +245,12 @@ export class RiotApiClient {
   getLeagueEntriesByPuuid(puuid: string): Promise<RiotLeagueEntryDto[]> {
     const path = `/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`;
     return this.request<RiotLeagueEntryDto[]>(this.platformHost(), path);
+  }
+
+  /** Maestría: top N campeones por puntos de maestría del jugador. */
+  getTopChampionMasteries(puuid: string, count: number): Promise<RiotChampionMasteryDto[]> {
+    const path = `/lol/champion-mastery/v4/champion-masteries/by-puuid/${encodeURIComponent(puuid)}/top?count=${count}`;
+    return this.request<RiotChampionMasteryDto[]>(this.platformHost(), path);
   }
 
   getMatchIdsByPuuid(
