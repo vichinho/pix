@@ -17,6 +17,8 @@ import { GetLiveChampionUseCase } from '../application/get-live-champion.js';
 import { GetLiveGameStateUseCase } from '../application/get-live-game-state.js';
 import { ApplyRunePageUseCase } from '../application/apply-rune-page.js';
 import { RunePageWriter, LcuUnavailableError } from '../infrastructure/lcu/rune-page.js';
+import { ApplyItemSetUseCase } from '../application/apply-item-set.js';
+import { ItemSetWriter } from '../infrastructure/lcu/item-set.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
 import { ClassifiedBuildProvider } from '../infrastructure/champions/champion-archetypes.js';
@@ -53,6 +55,8 @@ export interface ServerDeps {
   buildProvider?: BuildProvider;
   /** Escritor de páginas de runas al cliente (LCU). */
   runePageWriter?: RunePageWriter;
+  /** Escritor de sets de ítems al cliente (LCU). */
+  itemSetWriter?: ItemSetWriter;
   /** Directorio de la UI web estática. Por defecto, la carpeta `public` del repo. */
   staticDir?: string | null;
   /** Almacén de la última identidad conectada (por defecto en memoria). */
@@ -157,6 +161,8 @@ export function createServer(deps: ServerDeps = {}): Express {
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
   const runePageWriter = deps.runePageWriter ?? new RunePageWriter();
   const applyRunePage = new ApplyRunePageUseCase(buildProvider, runePageWriter);
+  const itemSetWriter = deps.itemSetWriter ?? new ItemSetWriter();
+  const applyItemSet = new ApplyItemSetUseCase(buildProvider, itemSetWriter);
   const getLiveChampion = new GetLiveChampionUseCase(liveGameReader, championCatalog);
   const getLiveGameState = new GetLiveGameStateUseCase(liveGameReader);
   const riotClient = deps.riotClient ?? null;
@@ -612,6 +618,30 @@ export function createServer(deps: ServerDeps = {}): Express {
           return;
         }
         res.status(500).json({ error: 'rune_apply_failed', message: String(err) });
+      }
+    }),
+  );
+
+  // Crea en el cliente el set de ítems (iniciales/core/situacionales) de la build.
+  app.post(
+    '/api/items/apply',
+    wrap(async (req: Request, res: Response) => {
+      const parsed = buildsQuerySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() });
+        return;
+      }
+      await championCatalog.getData().catch(() => null);
+      const meta = championCatalog.getMeta(parsed.data.championId);
+      try {
+        await applyItemSet.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN', meta?.name);
+        res.json({ ok: true });
+      } catch (err) {
+        if (err instanceof LcuUnavailableError) {
+          res.status(503).json({ error: 'client_not_running' });
+          return;
+        }
+        res.status(500).json({ error: 'item_apply_failed', message: String(err) });
       }
     }),
   );

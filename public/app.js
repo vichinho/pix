@@ -888,7 +888,7 @@ function renderBuild(b) {
     <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
     <div class="block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
     <div class="block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
-    <div class="block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div></div>
+    <div class="block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div>${applyItemsBtn(b)}</div>
     ${b.notes ? `<div class="note">💡 ${esc(b.notes)}</div>` : ''}
     <div class="source-note">${buildMeta(b)}</div>`;
 }
@@ -1090,22 +1090,26 @@ function buildBanner(b) {
 
 /** Botón para aplicar la página de runas en el cliente de LoL (LCU). */
 function applyRunesBtn(b) {
-  return `<button class="apply-runes" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}">
-    <span class="ar-ico">⟳</span> Aplicar runas en el cliente
-  </button>`;
+  return `<button class="apply-btn" data-endpoint="/api/runes/apply" data-ok="✓ Runas aplicadas en el cliente" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}"><span class="ar-ico">⟳</span> Aplicar runas en el cliente</button>`;
 }
 
-/** Envía la página de runas al cliente y da feedback en el propio botón. */
-async function applyRunes(btn) {
+/** Botón para crear el set de ítems en el cliente. */
+function applyItemsBtn(b) {
+  return `<button class="apply-btn secondary" data-endpoint="/api/items/apply" data-ok="✓ Ítems aplicados al cliente" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}"><span class="ar-ico">⟳</span> Aplicar ítems al cliente</button>`;
+}
+
+/** Envía la build (runas o ítems) al cliente y da feedback en el propio botón. */
+async function applyBuildAction(btn) {
   const championId = Number(btn.dataset.cid);
   const role = btn.dataset.role || 'UNKNOWN';
   const original = btn.innerHTML;
+  const base = btn.className.replace(/\s*(loading|ok|err)\b/g, '');
   btn.disabled = true;
+  btn.className = `${base} loading`;
   btn.innerHTML = '<span class="ar-ico">⟳</span> Aplicando…';
-  btn.className = 'apply-runes loading';
   let res, data = null;
   try {
-    res = await fetch('/api/runes/apply', {
+    res = await fetch(btn.dataset.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ championId, role }),
@@ -1114,22 +1118,22 @@ async function applyRunes(btn) {
   } catch { res = { ok: false, status: 0 }; }
 
   if (res.ok) {
-    btn.className = 'apply-runes ok';
-    btn.innerHTML = '✓ Runas aplicadas en el cliente';
+    btn.className = `${base} ok`;
+    btn.innerHTML = btn.dataset.ok || '✓ Aplicado';
   } else {
-    btn.className = 'apply-runes err';
+    btn.className = `${base} err`;
     const msg = res.status === 503 ? 'Abre el cliente de LoL primero'
       : res.status === 0 ? 'No se pudo conectar'
       : (data?.error || `Error ${res.status}`);
     btn.innerHTML = `✗ ${esc(msg)}`;
   }
-  setTimeout(() => { btn.disabled = false; btn.className = 'apply-runes'; btn.innerHTML = original; }, 2800);
+  setTimeout(() => { btn.disabled = false; btn.className = base; btn.innerHTML = original; }, 2800);
 }
 
-// Delegación global: cualquier botón .apply-runes aplica sus runas al pulsarlo.
+// Delegación global: cualquier botón .apply-btn aplica su acción al pulsarlo.
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest && e.target.closest('.apply-runes');
-  if (btn && !btn.disabled) applyRunes(btn);
+  const btn = e.target.closest && e.target.closest('.apply-btn');
+  if (btn && !btn.disabled) applyBuildAction(btn);
 });
 
 // Ruta de construcción: al pulsar un ítem, muestra/oculta sus componentes.

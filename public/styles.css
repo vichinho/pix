@@ -1048,20 +1048,24 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 .sm-cell.on.k-R { background: #e05c6b; color: #fff; }
 @media (max-width: 520px) { .sm-key { width: 24px; } .sm-cell { width: 18px; height: 18px; } }
 
-/* Botón: aplicar runas en el cliente */
-.apply-runes {
+/* Botones: aplicar runas / ítems en el cliente */
+.apply-btn {
   width: 100%; margin-top: 0.7rem; padding: 0.55rem 0.8rem;
   background: var(--accent); color: #16130a; border: none; border-radius: var(--radius-xs);
   font-size: 0.82rem; font-weight: 600; font-family: inherit; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
   transition: filter var(--transition), background var(--transition);
 }
-.apply-runes:hover:not(:disabled) { filter: brightness(1.08); }
-.apply-runes:disabled { cursor: default; opacity: 0.9; }
-.apply-runes.loading { background: var(--panel-3); color: var(--muted); }
-.apply-runes.ok { background: var(--win-soft); color: var(--win); }
-.apply-runes.err { background: var(--loss-soft); color: var(--loss); }
-.apply-runes .ar-ico { font-size: 0.9rem; }
+.apply-btn.secondary {
+  background: var(--panel-3); color: var(--text); border: 1px solid var(--border);
+}
+.apply-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.apply-btn.secondary:hover:not(:disabled) { border-color: var(--accent); }
+.apply-btn:disabled { cursor: default; opacity: 0.9; }
+.apply-btn.loading { background: var(--panel-3); color: var(--muted); border-color: var(--border); }
+.apply-btn.ok { background: var(--win-soft); color: var(--win); border-color: transparent; }
+.apply-btn.err { background: var(--loss-soft); color: var(--loss); border-color: transparent; }
+.apply-btn .ar-ico { font-size: 0.9rem; }
 
 /* ══════════════════════════════════════
    MAESTRÍA DE CAMPEONES + ACCESO RÁPIDO
