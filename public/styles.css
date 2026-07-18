@@ -1167,3 +1167,16 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
   text-shadow: 0 2px 8px rgba(0,0,0,0.85);
 }
 .build-banner.no-splash .bb-name { color: var(--text); text-shadow: none; }
+
+/* Aviso de tilt */
+.tilt-card { border-color: rgba(224,92,107,0.4); background: linear-gradient(180deg, rgba(224,92,107,0.08), var(--panel)); }
+.tilt-head { font-size: 0.72rem; font-weight: 700; color: var(--loss); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
+.tilt-msg { font-size: 0.82rem; color: var(--text); line-height: 1.5; }
+.tilt-dismiss { margin-top: 0.6rem; }
+
+/* Consejos y combos por campeón */
+.tips-list { list-style: none; margin: 0.2rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.tips-list li { font-size: 0.8rem; color: var(--muted); line-height: 1.45; padding-left: 1.1rem; position: relative; }
+.tips-list li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); }
+.tips-list .combo { color: var(--text); }
+.tips-list .combo b { color: var(--accent); font-weight: 700; }
