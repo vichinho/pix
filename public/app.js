@@ -728,7 +728,7 @@ function renderBuild(b) {
       <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
       <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
     </div>
-    ${skillOrderLine(b)}
+    ${renderSkillMatrix(b)}
     <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
     <div class="block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
     <div class="block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
@@ -751,12 +751,45 @@ function passiveChip(p) {
   return `<span class="abil" title="${tip}">${p.icon ? `<img class="sicon" src="${esc(p.icon)}" alt="${esc(p.name)}" loading="lazy"/>` : ''}<span class="ablabel">P</span></span>`;
 }
 
-/** Línea de orden de subida de habilidades (prioridad de maximización). */
-function skillOrderLine(b) {
-  const order = b.skillOrder || [];
-  if (!order.length) return '';
-  const seq = order.map((l) => `<span class="skill-key">${esc(l)}</span>`).join('<span class="skill-arrow">→</span>');
-  return `<div class="skill-order"><span class="so-label">Orden de subida</span><span class="so-seq">${seq}</span><span class="so-note">· sube R (6/11/16) siempre que puedas</span></div>`;
+/**
+ * Genera la secuencia de subida de nivel 1..18 a partir de la prioridad de
+ * maximización (p. ej. [Q,W,E]): R a 6/11/16, un punto en cada básica al inicio
+ * y luego se maximiza por prioridad. Devuelve un arreglo de 18 letras.
+ */
+function computeSkillMatrix(priority) {
+  const P = priority && priority.length >= 3 ? priority.slice(0, 3) : ['Q', 'W', 'E'];
+  const counts = { Q: 0, W: 0, E: 0, R: 0 };
+  const early = { 1: P[0], 2: P[1], 3: P[2] };
+  const levels = [];
+  for (let lvl = 1; lvl <= 18; lvl++) {
+    if (lvl === 6 || lvl === 11 || lvl === 16) { levels.push('R'); counts.R++; continue; }
+    if (early[lvl]) { levels.push(early[lvl]); counts[early[lvl]]++; continue; }
+    const pick = P.find((a) => counts[a] < 5) || P[P.length - 1];
+    levels.push(pick); counts[pick]++;
+  }
+  return levels;
+}
+
+/** Matriz de subida de habilidades (filas Q/W/E/R × niveles 1..18). */
+function renderSkillMatrix(b) {
+  const matrix = computeSkillMatrix(b.skillOrder);
+  const spells = b.spells || {};
+  const head = `<div class="sm-row sm-head"><div class="sm-key"></div>${
+    Array.from({ length: 18 }, (_, i) => `<div class="sm-cell sm-lvl">${i + 1}</div>`).join('')
+  }</div>`;
+  const body = ['Q', 'W', 'E', 'R'].map((letter) => {
+    const sp = spells[letter];
+    const tip = esc(sp ? tipText(sp, `${letter} · `) : letter);
+    const icon = sp && sp.icon
+      ? `<img src="${esc(sp.icon)}" alt="${esc(letter)}"/>`
+      : '';
+    const cells = matrix.map((lv, i) =>
+      `<div class="sm-cell ${lv === letter ? 'on k-' + letter : ''}">${lv === letter ? i + 1 : ''}</div>`,
+    ).join('');
+    return `<div class="sm-row"><div class="sm-key" title="${tip}">${icon}<span class="sm-letter">${letter}</span></div>${cells}</div>`;
+  }).join('');
+  return `<div class="block"><div class="label">Orden de subida de habilidades</div>
+    <div class="skill-matrix-wrap"><div class="skill-matrix">${head}${body}</div></div></div>`;
 }
 
 // --- Contexto -----------------------------------------------------------
@@ -851,7 +884,7 @@ function renderRunesSummoners(b) {
     <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
     <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
   </div>
-  ${skillOrderLine(b)}
+  ${renderSkillMatrix(b)}
   <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
   <div class="source-note">${buildMeta(b)}</div>`;
 }
@@ -932,9 +965,11 @@ function objectiveCell(label, icon, o) {
   </div>`;
 }
 
-/** Panel de coach en vivo. En ARAM no hay objetivos épicos: muestra otra ayuda. */
+/** Panel de coach en vivo. Los objetivos épicos sólo existen en la Grieta (mapa 11);
+ *  en el Abismo Aullador (ARAM y ARAM Mayhem, mapa 12) mostramos otra ayuda. */
 function renderLiveCoach(g) {
-  return g.gameMode === 'ARAM' ? renderAramCoach(g) : renderRiftCoach(g);
+  const isRift = g.mapNumber === 11 || (g.mapNumber == null && g.gameMode === 'CLASSIC');
+  return isRift ? renderRiftCoach(g) : renderAramCoach(g);
 }
 
 /** Coach de Grieta: objetivos épicos, timers y power-spike. */

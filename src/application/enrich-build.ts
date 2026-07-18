@@ -51,6 +51,8 @@ export interface EnrichedBuild {
   passive: EnrichedIcon | null;
   /** Habilidades en orden de prioridad (con icono si está disponible). */
   abilities: EnrichedAbility[];
+  /** Las cuatro habilidades por tecla (Q/W/E/R) para la matriz de subida. */
+  spells: Record<'Q' | 'W' | 'E' | 'R', EnrichedAbility | null>;
 }
 
 /**
@@ -81,6 +83,12 @@ export function bareEnrichedBuild(build: ChampionBuild): EnrichedBuild {
     items: { starting: items(build.startingItems), core: items(build.coreItems), situational: items(build.situationalItems) },
     passive: null,
     abilities: build.skillOrder.map((letter) => ({ letter, name: letter, icon: null })),
+    spells: {
+      Q: { letter: 'Q', name: 'Q', icon: null },
+      W: { letter: 'W', name: 'W', icon: null },
+      E: { letter: 'E', name: 'E', icon: null },
+      R: { letter: 'R', name: 'R', icon: null },
+    },
   };
 }
 
@@ -127,7 +135,7 @@ export async function enrichBuild(
   const spellByLetter = (letter: string) =>
     spells ? spells[letter as 'Q' | 'W' | 'E' | 'R'] : null;
 
-  const abilities: EnrichedAbility[] = build.skillOrder.map((letter) => {
+  const abilityFor = (letter: string): EnrichedAbility => {
     const a = spellByLetter(letter);
     return {
       letter,
@@ -135,7 +143,14 @@ export async function enrichBuild(
       icon: a && spellBase ? `${spellBase}${a.image}` : null,
       ...(a?.desc ? { desc: a.desc } : {}),
     };
-  });
+  };
+  const abilities: EnrichedAbility[] = build.skillOrder.map(abilityFor);
+  const spellsByKey = {
+    Q: abilityFor('Q'),
+    W: abilityFor('W'),
+    E: abilityFor('E'),
+    R: abilityFor('R'),
+  };
 
   const passive: EnrichedIcon | null = spells?.passive
     ? {
@@ -188,5 +203,6 @@ export async function enrichBuild(
     },
     passive,
     abilities,
+    spells: spellsByKey,
   };
 }

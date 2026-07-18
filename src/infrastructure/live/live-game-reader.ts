@@ -80,6 +80,7 @@ export class LiveGameReader {
       return {
         gameTime,
         gameMode: data.gameData?.gameMode ?? 'CLASSIC',
+        mapNumber: data.gameData?.mapNumber ?? 0,
         objectives: computeObjectives(gameTime, events),
         player: {
           level: data.activePlayer?.level ?? 0,
@@ -96,7 +97,7 @@ export class LiveGameReader {
 interface AllGameDataDto {
   activePlayer?: { level?: number; currentGold?: number };
   events?: { Events?: Array<{ EventName: string; EventTime: number }> };
-  gameData?: { gameTime?: number; gameMode?: string };
+  gameData?: { gameTime?: number; gameMode?: string; mapNumber?: number };
 }
 
 /** Estado de la partida en curso. */
@@ -104,6 +105,8 @@ export interface LiveGameState {
   gameTime: number;
   /** Modo de juego (CLASSIC, ARAM, URF…). Determina si hay objetivos épicos. */
   gameMode: string;
+  /** Número de mapa: 11 = Grieta (con objetivos), 12 = Abismo (ARAM/Mayhem). */
+  mapNumber: number;
   objectives: Objectives;
   player: { level: number; currentGold: number };
 }

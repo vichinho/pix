@@ -1020,3 +1020,29 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 }
 .champ-build-view { margin-top: 0.4rem; }
 .champ-build-view #champBack { margin-bottom: 0.7rem; display: inline-block; }
+
+/* ══════════════════════════════════════
+   MATRIZ DE SUBIDA DE HABILIDADES
+══════════════════════════════════════ */
+.skill-matrix-wrap { overflow-x: auto; padding-bottom: 0.3rem; }
+.skill-matrix { display: inline-flex; flex-direction: column; gap: 3px; min-width: max-content; }
+.sm-row { display: flex; gap: 3px; align-items: center; }
+.sm-key {
+  width: 30px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 2px;
+  font-size: 0.7rem; font-weight: 700; color: var(--muted);
+}
+.sm-key img { width: 20px; height: 20px; border-radius: 4px; }
+.sm-letter { display: none; }
+.sm-cell {
+  width: 22px; height: 22px; flex-shrink: 0; border-radius: 3px;
+  background: var(--panel-3); border: 1px solid var(--border-soft);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.62rem; color: var(--faint); font-variant-numeric: tabular-nums;
+}
+.sm-head .sm-lvl { background: transparent; border: none; color: var(--faint); font-weight: 600; }
+.sm-cell.on { color: #0b0d12; font-weight: 700; border-color: transparent; }
+.sm-cell.on.k-Q { background: #4a9de8; }
+.sm-cell.on.k-W { background: #46c98e; }
+.sm-cell.on.k-E { background: #c9a84c; }
+.sm-cell.on.k-R { background: #e05c6b; color: #fff; }
+@media (max-width: 520px) { .sm-key { width: 24px; } .sm-cell { width: 18px; height: 18px; } }
