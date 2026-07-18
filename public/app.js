@@ -3,6 +3,9 @@
 // --- Utilidades ---------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 
+/** Atajo de traducción (i18n.js). El español es la clave y el fallback. */
+const T = (s, params) => window.I18N.t(s, params);
+
 async function api(path, options) {
   try {
     const res = await fetch(path, options);
@@ -264,7 +267,7 @@ function emblemFallback(img) {
 }
 
 function renderProfile(p) {
-  const cached = clientConnected ? '' : ' <span class="pill ghost" style="font-size:0.65rem">última sesión</span>';
+  const cached = clientConnected ? '' : ` <span class="pill ghost" style="font-size:0.65rem">${T('última sesión')}</span>`;
   const rank = p.soloQueue || p.flexQueue || null;
   const emblemImg = rank ? rankEmblemImg(rank.tier) : `<div class="rank-emblem-placeholder"></div>`;
 
@@ -273,7 +276,7 @@ function renderProfile(p) {
     const wr = rank.wins + rank.losses > 0 ? Math.round((rank.wins / (rank.wins + rank.losses)) * 100) : 0;
     const wrGood = wr >= 50;
     const wrWidth = Math.max(5, Math.min(95, wr));
-    const queueLabel = p.soloQueue ? 'Solo/Duo' : 'Flex';
+    const queueLabel = p.soloQueue ? T('Solo/Duo') : T('Flex');
     rankBlock = `
       <div class="rank-row">
         <span class="rank-tier">${esc(rank.tier)}</span>
@@ -285,9 +288,9 @@ function renderProfile(p) {
         <div class="wr-bar-track"><div class="wr-bar-fill ${wrGood ? '' : 'low'}" style="width:${wrWidth}%"></div></div>
         <span class="wr-text ${wrGood ? 'good' : 'bad'}">${wr}% WR</span>
       </div>
-      <div class="ranked-record">${rank.wins}V / ${rank.losses}D · ${rank.wins + rank.losses} partidas clasificatorias</div>`;
+      <div class="ranked-record">${T('{w}V / {l}D · {n} partidas clasificatorias', { w: rank.wins, l: rank.losses, n: rank.wins + rank.losses })}</div>`;
   } else {
-    rankBlock = `<div class="rank-unranked">Sin clasificar esta temporada</div>`;
+    rankBlock = `<div class="rank-unranked">${T('Sin clasificar esta temporada')}</div>`;
   }
 
   let peakBlock = '';
@@ -297,7 +300,7 @@ function renderProfile(p) {
     peakBlock = `
       <div class="divider"></div>
       <div class="peak-row">
-        <span class="peak-label">Mejor liga</span>
+        <span class="peak-label">${T('Mejor liga')}</span>
         ${peakImg}
         <span class="peak-tier">${esc(pk.tier)}</span>
         <span class="peak-division">${esc(pk.division || '')}</span>
@@ -346,15 +349,16 @@ async function refreshStatus() {
     badge.textContent = stateEs(data.clientState);
     badge.className = 'pill on';
   } else {
-    badge.textContent = 'Desconectado';
+    badge.textContent = T('Desconectado');
     badge.className = 'pill off';
   }
   return data;
 }
 
 function stateEs(s) {
-  return ({ DISCONNECTED:'desconectado', NONE:'menú', LOBBY:'lobby', MATCHMAKING:'en cola',
+  const es = ({ DISCONNECTED:'desconectado', NONE:'menú', LOBBY:'lobby', MATCHMAKING:'en cola',
     READY_CHECK:'aceptar', CHAMP_SELECT:'champ select', IN_GAME:'en partida', POST_GAME:'post-partida' }[s] || s || '—');
+  return T(es);
 }
 
 // --- Vinculación manual de cuenta ---------------------------------------
@@ -364,16 +368,16 @@ function renderLinkForm() {
   const prefill = id ? `${id.gameName}#${id.tagLine}` : '';
   const sel = getLinkedPlatform();
   const options = RIOT_PLATFORMS.map(
-    (p) => `<option value="${p.v}"${p.v === sel ? ' selected' : ''}>${esc(p.label)}</option>`,
+    (p) => `<option value="${p.v}"${p.v === sel ? ' selected' : ''}>${esc(T(p.label))}</option>`,
   ).join('');
   return `
     <div class="link-form" style="padding:1.3rem">
-      <div class="muted" style="margin-bottom:.6rem">Abre el cliente de LoL una vez, o vincula tu cuenta a mano:</div>
+      <div class="muted" style="margin-bottom:.6rem">${T('Abre el cliente de LoL una vez, o vincula tu cuenta a mano:')}</div>
       <select id="riotPlatform" class="link-select">${options}</select>
       <div class="link-row">
-        <input id="riotIdInput" type="text" placeholder="Nombre#TAG (ej: Faker#KR1)" value="${esc(prefill)}"
+        <input id="riotIdInput" type="text" placeholder="${esc(T('Nombre#TAG (ej: Faker#KR1)'))}" value="${esc(prefill)}"
           autocomplete="off" spellcheck="false" />
-        <button id="riotIdBtn" type="button">Vincular</button>
+        <button id="riotIdBtn" type="button">${T('Vincular')}</button>
       </div>
       <div id="riotIdMsg" class="link-msg"></div>
     </div>`;
@@ -381,7 +385,7 @@ function renderLinkForm() {
 
 /** Enlace pequeño para revincular/cambiar la cuenta ya conectada. */
 function renderRelinkLink() {
-  return `<div class="relink"><button id="relinkBtn" type="button" class="linklike">Cambiar cuenta</button></div>`;
+  return `<div class="relink"><button id="relinkBtn" type="button" class="linklike">${T('Cambiar cuenta')}</button></div>`;
 }
 
 /** Conecta los eventos del formulario/enlace de vinculación tras renderizar. */
@@ -416,14 +420,14 @@ async function submitRiotId() {
   const raw = (input?.value || '').trim();
   const hash = raw.lastIndexOf('#');
   if (hash <= 0 || hash === raw.length - 1) {
-    if (msg) { msg.textContent = 'Formato: Nombre#TAG (ej: Faker#KR1)'; msg.className = 'link-msg err'; }
+    if (msg) { msg.textContent = T('Formato: Nombre#TAG (ej: Faker#KR1)'); msg.className = 'link-msg err'; }
     return;
   }
   const gameName = raw.slice(0, hash).trim();
   const tagLine = raw.slice(hash + 1).trim();
   const platform = $('riotPlatform')?.value || 'la2';
   setLinkedPlatform(platform);
-  if (msg) { msg.textContent = 'Verificando…'; msg.className = 'link-msg'; }
+  if (msg) { msg.textContent = T('Verificando…'); msg.className = 'link-msg'; }
 
   // Comprobamos contra la Riot API antes de guardar, para dar feedback claro.
   const check = await api(`/api/player/profile?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&platform=${encodeURIComponent(platform)}`);
@@ -438,19 +442,16 @@ async function submitRiotId() {
   }
 }
 
-/** Traduce los errores de la Riot API a mensajes claros en español. */
+/** Traduce los errores de la Riot API a mensajes claros para el usuario. */
 function riotErrorEs(resp) {
   const code = resp.data?.error;
   if (resp.status === 404 || code === 'not_found')
-    return 'No se encontró esa cuenta. Revisa el servidor y el Nombre#TAG (el tag suele ser 3-5 letras/números, ej: #LAS o #1234). '
-      + 'Si tu nombre tiene caracteres especiales, lo más fiable es <b>abrir el cliente de LoL</b>: la app detectará tu cuenta automáticamente.';
+    return T('No se encontró esa cuenta. Revisa el servidor y el Nombre#TAG (el tag suele ser 3-5 letras/números, ej: #LAS o #1234). Si tu nombre tiene caracteres especiales, lo más fiable es <b>abrir el cliente de LoL</b>: la app detectará tu cuenta automáticamente.');
   if (code === 'riot_api_key_invalid' || code === 'riot_api_key_forbidden_or_expired')
-    return 'Tu clave de Riot API no es válida o expiró. Las claves de desarrollo caducan cada 24 h: '
-      + 'genera una nueva en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a>, '
-      + 'actualízala en tu archivo <code>.env</code> (RIOT_API_KEY) y reinicia la app.';
+    return T('Tu clave de Riot API no es válida o expiró. Las claves de desarrollo caducan cada 24 h: genera una nueva en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a>, actualízala en Ajustes y reinicia si hace falta.');
   if (code === 'riot_rate_limited')
-    return 'La Riot API está limitando las peticiones (rate limit). Espera unos segundos e inténtalo de nuevo.';
-  return `No se pudo vincular: ${esc(code || `Error ${resp.status}`)}`;
+    return T('La Riot API está limitando las peticiones (rate limit). Espera unos segundos e inténtalo de nuevo.');
+  return T('No se pudo vincular: {e}', { e: esc(code || T('Error {n}', { n: resp.status })) });
 }
 
 // --- Onboarding / Ajustes: clave de la Riot API -------------------------
@@ -460,19 +461,20 @@ function riotErrorEs(resp) {
  * se guarda en el servidor (PUT /api/settings) — nunca se muestra de vuelta.
  */
 function renderApiKeyForm() {
+  const link = '<a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a>';
   return `
     <div class="apikey-form" style="padding:1.3rem">
-      <div class="apikey-title">Conecta tu Riot API</div>
+      <div class="apikey-title">${T('Conecta tu Riot API')}</div>
       <ol class="apikey-steps">
-        <li>Entra en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> e inicia sesión con tu cuenta de Riot.</li>
-        <li>Copia la <b>Development API Key</b> (empieza por <code>RGAPI-</code>).</li>
-        <li>Pégala aquí abajo. Se guarda en tu equipo, nunca se comparte.</li>
+        <li>${T('Entra en {a} e inicia sesión con tu cuenta de Riot.', { a: link })}</li>
+        <li>${T('Copia la {b} (empieza por {c}).', { b: '<b>Development API Key</b>', c: '<code>RGAPI-</code>' })}</li>
+        <li>${T('Pégala aquí abajo. Se guarda en tu equipo, nunca se comparte.')}</li>
       </ol>
-      <div class="apikey-note muted">Las claves de desarrollo caducan cada 24 h; cuando expire, repite estos pasos.</div>
+      <div class="apikey-note muted">${T('Las claves de desarrollo caducan cada 24 h; cuando expire, repite estos pasos.')}</div>
       <div class="link-row">
         <input id="apiKeyInput" type="password" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
           autocomplete="off" spellcheck="false" />
-        <button id="apiKeyBtn" type="button">Guardar</button>
+        <button id="apiKeyBtn" type="button">${T('Guardar')}</button>
       </div>
       <div id="apiKeyMsg" class="link-msg"></div>
     </div>`;
@@ -494,12 +496,12 @@ async function submitApiKey() {
   const msg = $('apiKeyMsg');
   const key = (input?.value || '').trim();
   if (!key) {
-    if (msg) { msg.textContent = 'Pega tu clave (empieza por RGAPI-).'; msg.className = 'link-msg err'; }
+    if (msg) { msg.textContent = T('Pega tu clave (empieza por RGAPI-).'); msg.className = 'link-msg err'; }
     return;
   }
   const btn = $('apiKeyBtn');
   if (btn) btn.disabled = true;
-  if (msg) { msg.textContent = 'Verificando y guardando…'; msg.className = 'link-msg'; }
+  if (msg) { msg.textContent = T('Verificando y guardando…'); msg.className = 'link-msg'; }
 
   const res = await api('/api/settings', {
     method: 'PUT',
@@ -509,18 +511,18 @@ async function submitApiKey() {
   if (btn) btn.disabled = false;
 
   if (res.ok && res.data?.riotConfigured) {
-    if (msg) { msg.textContent = '¡Listo! Cargando tu perfil…'; msg.className = 'link-msg ok'; }
+    if (msg) { msg.textContent = T('¡Listo! Cargando tu perfil…'); msg.className = 'link-msg ok'; }
     refreshRiotPanels();
     return;
   }
   const code = res.data?.error;
   if (msg) {
     if (code === 'riot_api_key_invalid')
-      msg.innerHTML = 'La clave no es válida o expiró. Genera una nueva en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> y vuelve a pegarla.';
+      msg.innerHTML = T('La clave no es válida o expiró. Genera una nueva en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> y vuelve a pegarla.');
     else if (code === 'invalid_body')
-      msg.textContent = 'El formato de la clave no es válido.';
+      msg.textContent = T('El formato de la clave no es válido.');
     else
-      msg.textContent = `No se pudo guardar: ${esc(code || `Error ${res.status}`)}`;
+      msg.textContent = T('No se pudo guardar: {e}', { e: esc(code || T('Error {n}', { n: res.status })) });
     msg.className = 'link-msg err';
   }
 }
@@ -606,8 +608,8 @@ function renderStatsFromMatches() {
   }).join('');
 
   el.innerHTML = `
-    <div class="summary"><span class="big ${wr >= 50 ? 'win' : 'loss'}">${wr}%</span><span>WR · ${wins}V ${losses}D · ${total} partidas</span></div>
-    <table><thead><tr><th>Campeón</th><th>P</th><th>WR</th><th>KDA</th></tr></thead><tbody>${rows}</tbody></table>`;
+    <div class="summary"><span class="big ${wr >= 50 ? 'win' : 'loss'}">${wr}%</span><span>${T('WR · {w}V {l}D · {n} partidas', { w: wins, l: losses, n: total })}</span></div>
+    <table><thead><tr><th>${T('Campeón')}</th><th>${T('P')}</th><th>${T('WR')}</th><th>${T('KDA')}</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // --- Resumen de la última partida ---------------------------------------
@@ -630,8 +632,8 @@ function renderLastGameSummary() {
   const aram = isAramQueue(m.queueId);
 
   const kda = kdaOf(m);
-  const kdaTxt = m.deaths === 0 ? 'KDA perfecto' : `KDA ${kda.toFixed(2)}`;
-  const resultTxt = m.win ? '🏆 Victoria' : '💀 Derrota';
+  const kdaTxt = m.deaths === 0 ? T('KDA perfecto') : T('KDA {v}', { v: kda.toFixed(2) });
+  const resultTxt = m.win ? T('🏆 Victoria') : T('💀 Derrota');
   const champ = m.championName || champName(m.championId);
   const dur = fmtDuration(m.durationSec || 0);
 
@@ -640,21 +642,21 @@ function renderLastGameSummary() {
 
   // Métricas y comparación con el promedio.
   const lines = [];
-  if (kda >= 3.5) lines.push('Gran KDA, jugaste muy limpio. 👏');
-  else if (m.deaths >= 8 || (kda < 1.5 && m.deaths >= 5)) lines.push('Moriste bastante — busca pelear con ventaja y respeta el rango enemigo.');
+  if (kda >= 3.5) lines.push(T('Gran KDA, jugaste muy limpio. 👏'));
+  else if (m.deaths >= 8 || (kda < 1.5 && m.deaths >= 5)) lines.push(T('Moriste bastante — busca pelear con ventaja y respeta el rango enemigo.'));
 
   if (!aram) {
     const csm = csmOf(m);
     const csmAvg = avg(csmOf);
     if (csm > 0) {
-      const cmp = csm < csmAvg - 0.8 ? ' (por debajo de tu promedio)' : csm > csmAvg + 0.8 ? ' (mejor que tu promedio)' : '';
-      lines.push(`Farmeo: ${csm.toFixed(1)} cs/min${cmp}.`);
+      const cmp = csm < csmAvg - 0.8 ? T(' (por debajo de tu promedio)') : csm > csmAvg + 0.8 ? T(' (mejor que tu promedio)') : '';
+      lines.push(T('Farmeo: {v} cs/min{cmp}.', { v: csm.toFixed(1), cmp }));
     }
   }
   if (m.damage) {
     const dmgAvg = avg((x) => x.damage || 0);
-    const cmp = m.damage < dmgAvg * 0.75 ? ' (bajo para tu campeón)' : m.damage > dmgAvg * 1.2 ? ' (excelente)' : '';
-    lines.push(`Daño a campeones: ${Math.round(m.damage).toLocaleString('es')}${cmp}.`);
+    const cmp = m.damage < dmgAvg * 0.75 ? T(' (bajo para tu campeón)') : m.damage > dmgAvg * 1.2 ? T(' (excelente)') : '';
+    lines.push(T('Daño a campeones: {v}{cmp}.', { v: Math.round(m.damage).toLocaleString(window.I18N.getLang()), cmp }));
   }
 
   // Consejo: el punto más flojo respecto al promedio.
@@ -671,19 +673,19 @@ function renderLastGameSummary() {
 function lastGameTip(m, avg, aram) {
   const kda = kdaOf(m);
   const kdaAvg = avg(kdaOf);
-  if (m.deaths >= 8) return 'Demasiadas muertes: cada muerte le da oro y tempo al rival. Prioriza sobrevivir sobre forzar jugadas.';
-  if (kda < kdaAvg * 0.7) return 'Tu KDA bajó respecto a tu media: elige mejor las peleas y no entres en desventaja numérica.';
+  if (m.deaths >= 8) return T('Demasiadas muertes: cada muerte le da oro y tempo al rival. Prioriza sobrevivir sobre forzar jugadas.');
+  if (kda < kdaAvg * 0.7) return T('Tu KDA bajó respecto a tu media: elige mejor las peleas y no entres en desventaja numérica.');
   if (!aram) {
     const csm = csmOf(m);
-    if (csm > 0 && csm < avg(csmOf) - 1) return 'Tu farmeo bajó: no descuides los súbditos entre jugadas, el oro constante marca la diferencia.';
+    if (csm > 0 && csm < avg(csmOf) - 1) return T('Tu farmeo bajó: no descuides los súbditos entre jugadas, el oro constante marca la diferencia.');
   }
   if (m.damage && m.damage < avg((x) => x.damage || 0) * 0.7) {
-    return 'Tu daño fue bajo: posiciónate para poder pegar en las peleas y aprovecha tus power-spikes de ítems.';
+    return T('Tu daño fue bajo: posiciónate para poder pegar en las peleas y aprovecha tus power-spikes de ítems.');
   }
   if ((m.visionScore || 0) > 0 && m.role === 'UTILITY' && m.visionScore < avg((x) => x.visionScore || 0) * 0.7) {
-    return 'Como soporte, sube tu visión: coloca y limpia guardianes alrededor de los objetivos.';
+    return T('Como soporte, sube tu visión: coloca y limpia guardianes alrededor de los objetivos.');
   }
-  return m.win ? 'Buen trabajo — mantén esta consistencia y sigue revisando tus power-spikes.' : 'Cabeza fría: analiza una cosa a mejorar por partida y a por la siguiente.';
+  return m.win ? T('Buen trabajo — mantén esta consistencia y sigue revisando tus power-spikes.') : T('Cabeza fría: analiza una cosa a mejorar por partida y a por la siguiente.');
 }
 
 // --- Detector de tilt (racha de derrotas) -------------------------------
@@ -701,9 +703,9 @@ function renderTiltAlert() {
   if (streak < 3 || tiltDismissed === latestId) { card.hidden = true; return; }
 
   const msg = streak >= 5
-    ? `Llevas <b>${streak} derrotas seguidas</b>. Este es un gran momento para parar: el tilt hace jugar peor y alarga las malas rachas. Descansa, hidrátate y vuelve con la mente fresca. 🧘`
-    : `Llevas <b>${streak} derrotas seguidas</b>. Ojo con el tilt — una pausa corta ahora suele evitar la 4.ª y 5.ª derrota. Respira antes de la próxima. 💧`;
-  body.innerHTML = `<div class="tilt-head">⚠️ Cuida tu racha</div><div class="tilt-msg">${msg}</div><button class="linklike tilt-dismiss" id="tiltDismiss">Entendido, ocultar</button>`;
+    ? T('Llevas <b>{n} derrotas seguidas</b>. Este es un gran momento para parar: el tilt hace jugar peor y alarga las malas rachas. Descansa, hidrátate y vuelve con la mente fresca. 🧘', { n: streak })
+    : T('Llevas <b>{n} derrotas seguidas</b>. Ojo con el tilt — una pausa corta ahora suele evitar la 4.ª y 5.ª derrota. Respira antes de la próxima. 💧', { n: streak });
+  body.innerHTML = `<div class="tilt-head">⚠️ ${T('Cuida tu racha')}</div><div class="tilt-msg">${msg}</div><button class="linklike tilt-dismiss" id="tiltDismiss">${T('Entendido, ocultar')}</button>`;
   card.hidden = false;
   $('tiltDismiss').addEventListener('click', () => { tiltDismissed = latestId; card.hidden = true; });
 }
@@ -721,7 +723,7 @@ function fmtPoints(n) {
 function masteryTile(m, clickable) {
   const url = champIconUrl(m.championId);
   const img = url ? `<img src="${esc(url)}" alt="${esc(champName(m.championId))}" loading="lazy"/>` : '';
-  const tip = `${champName(m.championId)} · Maestría ${m.level} · ${m.points.toLocaleString('es')} pts`;
+  const tip = T('{name} · Maestría {lvl} · {pts} pts', { name: champName(m.championId), lvl: m.level, pts: m.points.toLocaleString(window.I18N.getLang()) });
   const attrs = clickable ? `data-cid="${esc(m.championId)}"` : '';
   const cls = clickable ? 'mastery-tile clickable' : 'mastery-tile';
   return `<div class="${cls}" ${attrs} data-tip="${esc(tip)}">${img}<span class="m-lvl">M${esc(m.level)}</span><span class="m-pts">${esc(fmtPoints(m.points))}</span></div>`;
@@ -763,7 +765,7 @@ const QUEUE_NAMES = {
   840: 'Co-op vs IA', 850: 'Co-op vs IA', 900: 'URF', 1700: 'Arena', 1710: 'Arena', 1900: 'URF',
   1300: 'Nexus Blitz', 1400: 'Libro de Hechizos', 2400: 'ARAM Mayhem', 2300: 'Mayhem',
 };
-const queueName = (id) => QUEUE_NAMES[id] || `Cola ${id}`;
+const queueName = (id) => (QUEUE_NAMES[id] ? T(QUEUE_NAMES[id]) : T('Cola {id}', { id }));
 
 /**
  * Formatea la duración en segundos como "mm:ss".
@@ -780,11 +782,11 @@ function fmtDuration(sec) {
 function fmtRelative(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 60)   return `hace ${mins}m`;
+  if (mins < 60)   return T('hace {n}m', { n: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24)    return `hace ${hrs}h`;
+  if (hrs < 24)    return T('hace {n}h', { n: hrs });
   const days = Math.floor(hrs / 24);
-  return `hace ${days}d`;
+  return T('hace {n}d', { n: days });
 }
 
 /**
@@ -812,7 +814,7 @@ function renderMatchPage() {
   const total = all.length;
 
   if (total === 0) {
-    body.innerHTML = '<span class="muted">No hay partidas recientes.</span>';
+    body.innerHTML = `<span class="muted">${T('No hay partidas recientes.')}</span>`;
     pag.hidden = true;
     info.textContent = '';
     return;
@@ -831,13 +833,13 @@ function renderMatchPage() {
       ? `<img class="match-champ-icon" src="${esc(iconUrl)}" alt="${esc(champName(m.championId))}" loading="lazy"/>`
       : `<div class="match-champ-icon" style="display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--faint)">${esc(m.championId)}</div>`;
 
-    const role    = ROLE_ES[m.role] || m.role;
+    const role    = T(ROLE_ES[m.role] || m.role);
     const kda     = kdaStr(m.kills, m.deaths, m.assists);
     const dur     = fmtDuration(m.durationSec || 0);
     const rel     = m.playedAt ? fmtRelative(m.playedAt) : '';
     const winCls  = m.win ? 'win' : 'loss';
     const rowCls  = m.win ? 'win-row' : 'loss-row';
-    const result  = m.win ? 'Victoria' : 'Derrota';
+    const result  = m.win ? T('Victoria') : T('Derrota');
     const isOpen  = matchState.expanded === m.matchId;
 
     return `<div class="match-item ${isOpen ? 'open' : ''}">
@@ -859,7 +861,7 @@ function renderMatchPage() {
   }).join('');
 
   // Paginación
-  info.textContent = `${total} partidas`;
+  info.textContent = T('{n} partidas', { n: total });
   label.textContent = `${page + 1} / ${totalPages}`;
   prev.disabled = page === 0;
   next.disabled = page >= totalPages - 1;
@@ -879,7 +881,7 @@ function renderMatchDetail(m) {
     return url ? `<img class="detail-spell" src="${esc(url)}" alt="" loading="lazy"/>` : '';
   }).join('');
   const perMin = m.durationSec ? (m.cs / (m.durationSec / 60)).toFixed(1) : '0';
-  const kdaRatio = m.deaths === 0 ? 'Perfecto' : ((m.kills + m.assists) / m.deaths).toFixed(2);
+  const kdaRatio = m.deaths === 0 ? T('Perfecto') : ((m.kills + m.assists) / m.deaths).toFixed(2);
   const stat = (label, value) => `<div class="detail-stat"><span class="ds-val">${esc(value)}</span><span class="ds-label">${esc(label)}</span></div>`;
 
   return `<div class="match-detail">
@@ -888,12 +890,12 @@ function renderMatchDetail(m) {
       <div class="detail-items">${items}</div>
     </div>
     <div class="detail-stats">
-      ${stat('KDA', kdaRatio)}
-      ${stat('CS', `${m.cs} (${perMin}/m)`)}
-      ${stat('Oro', (m.gold / 1000).toFixed(1) + 'k')}
-      ${stat('Daño', (m.damage / 1000).toFixed(1) + 'k')}
-      ${stat('Visión', m.visionScore)}
-      ${stat('Nivel', m.championLevel)}
+      ${stat(T('KDA'), kdaRatio)}
+      ${stat(T('CS'), `${m.cs} (${perMin}/m)`)}
+      ${stat(T('Oro'), (m.gold / 1000).toFixed(1) + 'k')}
+      ${stat(T('Daño'), (m.damage / 1000).toFixed(1) + 'k')}
+      ${stat(T('Visión'), m.visionScore)}
+      ${stat(T('Nivel'), m.championLevel)}
     </div>
     <div class="detail-foot">${esc(fmtDuration(m.durationSec || 0))} · ${esc(queueName(m.queueId))} · ${esc(m.playedAt ? fmtRelative(m.playedAt) : '')}</div>
   </div>`;
@@ -924,7 +926,7 @@ function matchFilterQuery() {
 
 async function refreshMatches() {
   const body = $('matchesBody');
-  body.innerHTML = '<span class="muted">Cargando partidas…</span>';
+  body.innerHTML = `<span class="muted">${T('Cargando partidas…')}</span>`;
   $('matchPagination').hidden = true;
   const fq = matchFilterQuery();
 
@@ -987,9 +989,9 @@ function renderTips(championId) {
   if (!tips || !tips.length) return '';
   const items = tips.map((t) => {
     const m = t.match(/^combo:\s*(.*)$/i);
-    return m ? `<li class="combo"><b>Combo:</b> ${esc(m[1])}</li>` : `<li>${esc(t)}</li>`;
+    return m ? `<li class="combo"><b>${T('Combo:')}</b> ${esc(m[1])}</li>` : `<li>${esc(t)}</li>`;
   }).join('');
-  return `<div class="block"><div class="label">Consejos y combos</div><ul class="tips-list">${items}</ul></div>`;
+  return `<div class="block"><div class="label">${T('Consejos y combos')}</div><ul class="tips-list">${items}</ul></div>`;
 }
 
 // --- Build --------------------------------------------------------------
@@ -997,14 +999,14 @@ function renderBuild(b) {
   return `
     ${buildBanner(b)}
     <div class="kv">
-      <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
-      <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
+      <span class="k">${T('Hechizos')}</span><span class="iconrow">${summRow(b.summoners)}</span>
+      <span class="k">${T('Habilidades')}</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
     </div>
     ${renderSkillMatrix(b)}
-    <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
-    <div class="block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
-    <div class="block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
-    <div class="block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div>${applyItemsBtn(b)}</div>
+    <div class="block"><div class="label">${T('Runas')}</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
+    <div class="block"><div class="label">${T('Ítems iniciales')}</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
+    <div class="block"><div class="label">${T('Core')}</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
+    <div class="block"><div class="label">${T('Situacionales')}</div><div class="iconrow">${itemRow(b.items.situational)}</div>${applyItemsBtn(b)}</div>
     ${b.notes ? `<div class="note">💡 ${esc(b.notes)}</div>` : ''}
     ${renderTips(b.championId)}
     <div class="source-note">${buildMeta(b)}</div>`;
@@ -1012,15 +1014,16 @@ function renderBuild(b) {
 
 /** Etiqueta de fuente + parche de la build. */
 function buildMeta(b) {
-  const src = { curated: 'curada', classified: 'por campeón', archetype: 'por clase', default: 'genérica' }[b.source] || b.source;
-  const patch = /^\d+\.\d+/.test(b.patch || '') ? `Parche ${b.patch}` : esc(b.patch);
-  return `Build ${esc(src)} · ${patch}`;
+  const esSrc = { curated: 'curada', classified: 'por campeón', archetype: 'por clase', default: 'genérica' }[b.source] || b.source;
+  const src = T(esSrc);
+  const patch = /^\d+\.\d+/.test(b.patch || '') ? T('Parche {p}', { p: b.patch }) : esc(b.patch);
+  return T('Build {src} · {patch}', { src: esc(src), patch });
 }
 
 /** Chip de la pasiva con tooltip. */
 function passiveChip(p) {
   if (!p) return '';
-  const tip = esc(tipText(p, 'Pasiva · '));
+  const tip = esc(tipText(p, T('Pasiva · ')));
   return `<span class="abil" data-tip="${tip}">${p.icon ? `<img class="sicon" src="${esc(p.icon)}" alt="${esc(p.name)}" loading="lazy"/>` : ''}<span class="ablabel">P</span></span>`;
 }
 
@@ -1061,7 +1064,7 @@ function renderSkillMatrix(b) {
     ).join('');
     return `<div class="sm-row"><div class="sm-key" data-tip="${tip}">${icon}<span class="sm-letter">${letter}</span></div>${cells}</div>`;
   }).join('');
-  return `<div class="block"><div class="label">Orden de subida de habilidades</div>
+  return `<div class="block"><div class="label">${T('Orden de subida de habilidades')}</div>
     <div class="skill-matrix-wrap"><div class="skill-matrix">${head}${body}</div></div></div>`;
 }
 
@@ -1101,10 +1104,10 @@ let contextMode = null;
 
 /** Panel inactivo: explorador de builds de cualquier campeón. */
 function renderIdleContext() {
-  $('contextTitle').textContent = 'Explorar builds';
+  $('contextTitle').textContent = T('Explorar builds');
   const champs = [...catalogById.values()].sort((a, b) => a.name.localeCompare(b.name));
   if (!champs.length) {
-    $('contextBody').innerHTML = '<span class="muted">Cargando campeones…</span>';
+    $('contextBody').innerHTML = `<span class="muted">${T('Cargando campeones…')}</span>`;
     contextMode = null; // reintenta en el próximo tick cuando cargue el catálogo
     return;
   }
@@ -1116,14 +1119,14 @@ function renderIdleContext() {
   // Acceso rápido: tus campeones con más maestría (si hay datos de Riot).
   const quick = masteryList.length
     ? `<div class="quick-access">
-        <div class="qa-label">Tus campeones (maestría)</div>
+        <div class="qa-label">${T('Tus campeones (maestría)')}</div>
         <div class="qa-row">${masteryList.slice(0, 8).map((m) => masteryTile(m, true)).join('')}</div>
       </div>`
     : '';
   $('contextBody').innerHTML = `
-    <div class="muted" style="margin-bottom:.6rem">No estás en partida. Busca cualquier campeón para ver su build, runas y orden de subida:</div>
+    <div class="muted" style="margin-bottom:.6rem">${T('No estás en partida. Busca cualquier campeón para ver su build, runas y orden de subida:')}</div>
     ${quick}
-    <input id="champSearch" class="champ-search" type="text" placeholder="Buscar campeón…" autocomplete="off" spellcheck="false"/>
+    <input id="champSearch" class="champ-search" type="text" placeholder="${esc(T('Buscar campeón…'))}" autocomplete="off" spellcheck="false"/>
     <div id="champGrid" class="champ-grid">${tiles}</div>
     <div id="champBuildView" class="champ-build-view"></div>`;
 
@@ -1166,15 +1169,15 @@ async function showIdleBuild(championId, role = 'MIDDLE') {
   if (search) search.style.display = 'none';
 
   const lanes = EXPLORER_LANES.map(
-    (l) => `<button class="lane-pill ${l.v === role ? 'on' : ''}" data-role="${l.v}">${esc(l.label)}</button>`,
+    (l) => `<button class="lane-pill ${l.v === role ? 'on' : ''}" data-role="${l.v}">${esc(T(l.label))}</button>`,
   ).join('');
   const header = `
-    <button class="linklike" id="champBack">← volver a la lista</button>
-    <div class="lane-picker"><span class="lane-label">Línea:</span>${lanes}</div>`;
+    <button class="linklike" id="champBack">${T('← volver a la lista')}</button>
+    <div class="lane-picker"><span class="lane-label">${T('Línea:')}</span>${lanes}</div>`;
 
-  view.innerHTML = `${header}<div id="laneBuild"><span class="muted">Cargando build…</span></div>`;
+  view.innerHTML = `${header}<div id="laneBuild"><span class="muted">${T('Cargando build…')}</span></div>`;
   const b = await api(`/api/builds?championId=${championId}&role=${encodeURIComponent(role)}`);
-  $('laneBuild').innerHTML = b.ok ? renderBuild(b.data) : '<span class="muted">Sin build para este campeón.</span>';
+  $('laneBuild').innerHTML = b.ok ? renderBuild(b.data) : `<span class="muted">${T('Sin build para este campeón.')}</span>`;
 
   $('champBack').addEventListener('click', () => {
     view.innerHTML = '';
@@ -1189,11 +1192,11 @@ async function showIdleBuild(championId, role = 'MIDDLE') {
 
 function renderRunesSummoners(b) {
   return `<div class="kv">
-    <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
-    <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
+    <span class="k">${T('Hechizos')}</span><span class="iconrow">${summRow(b.summoners)}</span>
+    <span class="k">${T('Habilidades')}</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
   </div>
   ${renderSkillMatrix(b)}
-  <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
+  <div class="block"><div class="label">${T('Runas')}</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
   <div class="source-note">${buildMeta(b)}</div>`;
 }
 
@@ -1207,12 +1210,12 @@ function buildBanner(b) {
 
 /** Botón para aplicar la página de runas en el cliente de LoL (LCU). */
 function applyRunesBtn(b) {
-  return `<button class="apply-btn" data-endpoint="/api/runes/apply" data-ok="✓ Runas aplicadas en el cliente" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}"><span class="ar-ico">⟳</span> Aplicar runas en el cliente</button>`;
+  return `<button class="apply-btn" data-endpoint="/api/runes/apply" data-ok="${esc(T('✓ Runas aplicadas en el cliente'))}" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}"><span class="ar-ico">⟳</span> ${T('Aplicar runas en el cliente')}</button>`;
 }
 
 /** Botón para crear el set de ítems en el cliente. */
 function applyItemsBtn(b) {
-  return `<button class="apply-btn secondary" data-endpoint="/api/items/apply" data-ok="✓ Ítems aplicados al cliente" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}"><span class="ar-ico">⟳</span> Aplicar ítems al cliente</button>`;
+  return `<button class="apply-btn secondary" data-endpoint="/api/items/apply" data-ok="${esc(T('✓ Ítems aplicados al cliente'))}" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}"><span class="ar-ico">⟳</span> ${T('Aplicar ítems al cliente')}</button>`;
 }
 
 /** Envía la build (runas o ítems) al cliente y da feedback en el propio botón. */
@@ -1223,7 +1226,7 @@ async function applyBuildAction(btn) {
   const base = btn.className.replace(/\s*(loading|ok|err)\b/g, '');
   btn.disabled = true;
   btn.className = `${base} loading`;
-  btn.innerHTML = '<span class="ar-ico">⟳</span> Aplicando…';
+  btn.innerHTML = `<span class="ar-ico">⟳</span> ${T('Aplicando…')}`;
   let res, data = null;
   try {
     res = await fetch(btn.dataset.endpoint, {
@@ -1236,12 +1239,12 @@ async function applyBuildAction(btn) {
 
   if (res.ok) {
     btn.className = `${base} ok`;
-    btn.innerHTML = btn.dataset.ok || '✓ Aplicado';
+    btn.innerHTML = btn.dataset.ok || T('✓ Aplicado');
   } else {
     btn.className = `${base} err`;
-    const msg = res.status === 503 ? 'Abre el cliente de LoL primero'
-      : res.status === 0 ? 'No se pudo conectar'
-      : (data?.error || `Error ${res.status}`);
+    const msg = res.status === 503 ? T('Abre el cliente de LoL primero')
+      : res.status === 0 ? T('No se pudo conectar')
+      : (data?.error || T('Error {n}', { n: res.status }));
     btn.innerHTML = `✗ ${esc(msg)}`;
   }
   setTimeout(() => { btn.disabled = false; btn.className = base; btn.innerHTML = original; }, 2800);
@@ -1309,7 +1312,7 @@ async function refreshChampSelect() {
   $('contextTitle').textContent = 'Champion Select';
   const { data } = await api('/api/champ-select/session');
   if (!data || !data.active || !data.session) {
-    $('contextBody').innerHTML = '<span class="muted">Detectando champ select…</span>';
+    $('contextBody').innerHTML = `<span class="muted">${T('Detectando champ select…')}</span>`;
     return;
   }
   const s = data.session;
@@ -1319,23 +1322,23 @@ async function refreshChampSelect() {
   if (rec.ok) { const tmp = document.createElement('div'); renderRecommendations(tmp, rec.data); recHtml = tmp.innerHTML; }
   let pickHtml = '';
   if (s.selectedChampionId) {
-    const head = `${champChip(s.selectedChampionId, 30)} <span class="pill ghost">${s.pickCompleted ? 'confirmado' : 'eligiendo'}</span>`;
+    const head = `${champChip(s.selectedChampionId, 30)} <span class="pill ghost">${s.pickCompleted ? T('confirmado') : T('eligiendo')}</span>`;
     const b = await api(`/api/builds?championId=${s.selectedChampionId}&role=${s.assignedRole}`);
-    const body = b.ok ? renderRunesSummoners(b.data) : '<span class="muted">Sin runas sugeridas todavía.</span>';
-    pickHtml = `<div class="block"><div class="label">Tu campeón · runas y hechizos</div><div class="pickhead">${head}</div>${body}</div>`;
+    const body = b.ok ? renderRunesSummoners(b.data) : `<span class="muted">${T('Sin runas sugeridas todavía.')}</span>`;
+    pickHtml = `<div class="block"><div class="label">${T('Tu campeón · runas y hechizos')}</div><div class="pickhead">${head}</div>${body}</div>`;
   }
   $('contextBody').innerHTML = `
     <div class="kv">
-      <span class="k">Rol</span><span>${esc(ROLE_ES[s.assignedRole] || s.assignedRole)}</span>
-      <span class="k">Fase</span><span class="faint">${esc(s.phase)}</span>
-      <span class="k">Bans</span><span class="iconrow">${(s.bans || []).map((b) => champChip(b, 18)).join(' ') || '—'}</span>
+      <span class="k">${T('Rol')}</span><span>${esc(T(ROLE_ES[s.assignedRole] || s.assignedRole))}</span>
+      <span class="k">${T('Fase')}</span><span class="faint">${esc(s.phase)}</span>
+      <span class="k">${T('Bans')}</span><span class="iconrow">${(s.bans || []).map((b) => champChip(b, 18)).join(' ') || '—'}</span>
     </div>
     ${pickHtml}
-    <div class="block"><div class="label">Sugerencias para tu rol</div>${recHtml}</div>`;
+    <div class="block"><div class="label">${T('Sugerencias para tu rol')}</div>${recHtml}</div>`;
 }
 
 async function refreshInGame(livePrefetched) {
-  $('contextTitle').textContent = 'En partida';
+  $('contextTitle').textContent = T('En partida');
   let championId = null;
   let role = lastPickedRole;
   const live = livePrefetched ?? (await api('/api/live/champion'));
@@ -1346,7 +1349,7 @@ async function refreshInGame(livePrefetched) {
     championId = lastPickedChampionId;
   }
   if (!championId) {
-    $('contextBody').innerHTML = '<span class="muted">Detectando tu campeón… (si acabas de abrir la app en partida, dame unos segundos)</span>';
+    $('contextBody').innerHTML = `<span class="muted">${T('Detectando tu campeón… (si acabas de abrir la app en partida, dame unos segundos)')}</span>`;
     return;
   }
   const b = await api(`/api/builds?championId=${championId}&role=${role || 'UNKNOWN'}`);
@@ -1356,7 +1359,7 @@ async function refreshInGame(livePrefetched) {
   const game = await api('/api/live/game');
   const coachHtml = game.ok && game.data?.active ? renderLiveCoach(game.data) : '';
 
-  const buildHtml = b.ok ? renderBuild(b.data) : '<span class="muted">Sin build para este campeón todavía.</span>';
+  const buildHtml = b.ok ? renderBuild(b.data) : `<span class="muted">${T('Sin build para este campeón todavía.')}</span>`;
   $('contextBody').innerHTML = head + coachHtml + buildHtml;
 }
 
@@ -1370,9 +1373,9 @@ function fmtCountdown(sec) {
 
 function objectiveCell(label, icon, o) {
   let statusHtml;
-  if (o.status === 'up') statusHtml = '<span class="obj-up">Disponible</span>';
+  if (o.status === 'up') statusHtml = `<span class="obj-up">${T('Disponible')}</span>`;
   else if (o.status === 'respawning') statusHtml = `<span class="obj-timer">${fmtCountdown(o.secondsUntil)}</span>`;
-  else if (o.status === 'not_yet') statusHtml = `<span class="obj-soon">en ${fmtCountdown(o.secondsUntil)}</span>`;
+  else if (o.status === 'not_yet') statusHtml = `<span class="obj-soon">${T('en {t}', { t: fmtCountdown(o.secondsUntil) })}</span>`;
   else statusHtml = '<span class="obj-gone">—</span>';
   const taken = o.taken > 0 ? `<span class="obj-count">${o.taken}</span>` : '';
   return `<div class="obj-cell">
@@ -1393,23 +1396,23 @@ function renderRiftCoach(g) {
   const o = g.objectives;
   const gold = g.player.currentGold;
   const spike =
-    gold >= 3000 ? '💰 Tienes oro para un ítem grande — considera volver a la base.'
-    : gold >= 1300 ? '💰 Oro suficiente para un componente clave — planea tu recall.'
+    gold >= 3000 ? T('💰 Tienes oro para un ítem grande — considera volver a la base.')
+    : gold >= 1300 ? T('💰 Oro suficiente para un componente clave — planea tu recall.')
     : null;
   const advice = [];
-  if (o.dragon.status === 'up') advice.push('🐉 Dragón disponible — coordina con tu equipo.');
-  if (o.baron.status === 'up') advice.push('🦑 Barón disponible — asegúralo con visión.');
-  if (o.herald.status === 'up') advice.push('👁️ Heraldo disponible — buen momento para presionar una calle.');
+  if (o.dragon.status === 'up') advice.push(T('🐉 Dragón disponible — coordina con tu equipo.'));
+  if (o.baron.status === 'up') advice.push(T('🦑 Barón disponible — asegúralo con visión.'));
+  if (o.herald.status === 'up') advice.push(T('👁️ Heraldo disponible — buen momento para presionar una calle.'));
   if (spike) advice.push(spike);
 
   return `<div class="block coach">
-    <div class="label">Coach en vivo · ${fmtCountdown(g.gameTime)}</div>
+    <div class="label">${T('Coach en vivo · {t}', { t: fmtCountdown(g.gameTime) })}</div>
     <div class="objectives">
-      ${objectiveCell('Dragón', '🐉', o.dragon)}
-      ${objectiveCell('Heraldo', '👁️', o.herald)}
-      ${objectiveCell('Barón', '🦑', o.baron)}
+      ${objectiveCell(T('Dragón'), '🐉', o.dragon)}
+      ${objectiveCell(T('Heraldo'), '👁️', o.herald)}
+      ${objectiveCell(T('Barón'), '🦑', o.baron)}
     </div>
-    <div class="coach-player">Nivel ${esc(g.player.level)} · ${esc(gold)} oro</div>
+    <div class="coach-player">${T('Nivel {l} · {g} oro', { l: esc(g.player.level), g: esc(gold) })}</div>
     ${advice.length ? `<ul class="coach-advice">${advice.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
   </div>`;
 }
@@ -1418,44 +1421,45 @@ function renderRiftCoach(g) {
 function renderAramCoach(g) {
   const gold = g.player.currentGold;
   const advice = [];
-  if (gold >= 1600) advice.push('💰 Tienes oro para un ítem completo — cómpralo al morir (no puedes volver a la base).');
-  advice.push('❤️ Recoge el orbe de salud del centro cuando pases por ahí: cura y da maná.');
-  advice.push('🤝 Agrúpate con tu equipo: en ARAM las peleas son 5v5 constantes, evita ir solo.');
-  advice.push('🛡️ Compra resistencias si el enemigo tiene mucho daño — mueres muy rápido en el pasillo único.');
+  if (gold >= 1600) advice.push(T('💰 Tienes oro para un ítem completo — cómpralo al morir (no puedes volver a la base).'));
+  advice.push(T('❤️ Recoge el orbe de salud del centro cuando pases por ahí: cura y da maná.'));
+  advice.push(T('🤝 Agrúpate con tu equipo: en ARAM las peleas son 5v5 constantes, evita ir solo.'));
+  advice.push(T('🛡️ Compra resistencias si el enemigo tiene mucho daño — mueres muy rápido en el pasillo único.'));
 
   return `<div class="block coach">
-    <div class="label">Coach ARAM · ${fmtCountdown(g.gameTime)}</div>
-    <div class="coach-player">Nivel ${esc(g.player.level)} · ${esc(gold)} oro</div>
+    <div class="label">${T('Coach ARAM · {t}', { t: fmtCountdown(g.gameTime) })}</div>
+    <div class="coach-player">${T('Nivel {l} · {g} oro', { l: esc(g.player.level), g: esc(gold) })}</div>
     <ul class="coach-advice">${advice.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
   </div>`;
 }
 
 function renderRecommendations(target, data) {
   if (!data || !data.recommendations || data.recommendations.length === 0) {
-    target.innerHTML = '<span class="muted">Sin sugerencias para este rol.</span>';
+    target.innerHTML = `<span class="muted">${T('Sin sugerencias para este rol.')}</span>`;
     return;
   }
   const items = data.recommendations.map((r) => `<li class="recitem">
     <span>${champChip(r.championId, 24)}<span class="reason">${esc(reasonEs(r.reason))}</span></span>
     <span class="score">${r.score}</span>
   </li>`).join('');
-  const meta = data.personalized ? ` <span class="pill live">personalizado · ${data.basedOnGames}</span>` : '';
-  target.innerHTML = `<div class="summary"><span>Rol: ${esc(ROLE_ES[data.role] || data.role)}</span>${meta}</div><ul class="reclist">${items}</ul>`;
+  const meta = data.personalized ? ` <span class="pill live">${T('personalizado · {n}', { n: data.basedOnGames })}</span>` : '';
+  target.innerHTML = `<div class="summary"><span>${T('Rol: {r}', { r: esc(T(ROLE_ES[data.role] || data.role)) })}</span>${meta}</div><ul class="reclist">${items}</ul>`;
 }
 
 function reasonEs(r) {
-  return { meta_pick:'meta', comfort_pick:'cómodo', comfort_pick_plus_meta:'cómodo + meta' }[r] || r || '';
+  const es = { meta_pick:'meta', comfort_pick:'cómodo', comfort_pick_plus_meta:'cómodo + meta' }[r] || r || '';
+  return es ? T(es) : es;
 }
 
 async function refreshAram() {
-  $('contextTitle').textContent = 'ARAM — Composición';
+  $('contextTitle').textContent = T('ARAM — Composición');
   const { data } = await api('/api/aram/analysis');
-  if (!data || !data.isAram) { $('contextBody').innerHTML = '<span class="muted">Detectando sesión de ARAM…</span>'; return; }
+  if (!data || !data.isAram) { $('contextBody').innerHTML = `<span class="muted">${T('Detectando sesión de ARAM…')}</span>`; return; }
   const comp = data.currentComp;
-  const balanced = comp.balanced ? '<span class="verdict-yes">✓ Equipo equilibrado</span>' : '<span class="verdict-no">⚠ Falta algo</span>';
+  const balanced = comp.balanced ? `<span class="verdict-yes">${T('✓ Equipo equilibrado')}</span>` : `<span class="verdict-no">${T('⚠ Falta algo')}</span>`;
   const missing   = (comp.missing || []).map((m) => `<span class="tag bad">${esc(m)}</span>`).join('');
   const strengths = (comp.strengths || []).map((m) => `<span class="tag good">${esc(m)}</span>`).join('');
-  const team  = (data.team || []).map((c) => `<span class="chip">${champChip(c.championId, 22)}${c.isLocalPlayer ? ' <span class="pill ghost">tú</span>' : ''}</span>`).join(' ');
+  const team  = (data.team || []).map((c) => `<span class="chip">${champChip(c.championId, 22)}${c.isLocalPlayer ? ` <span class="pill ghost">${T('tú')}</span>` : ''}</span>`).join(' ');
   const bench = (data.bench || []).map((c) => champChip(c.championId, 22)).join(' ') || '<span class="muted">—</span>';
   let best = '<span class="muted">—</span>';
   if (data.bestOption) {
@@ -1474,21 +1478,21 @@ async function refreshAram() {
     lastPickedRole = 'ARAM';
     const b = await api(`/api/builds?championId=${localChamp.championId}&role=ARAM`);
     if (b.ok) {
-      buildHtml = `<div class="block"><div class="label">Tu build</div>${renderBuild(b.data)}</div>`;
+      buildHtml = `<div class="block"><div class="label">${T('Tu build')}</div>${renderBuild(b.data)}</div>`;
     }
   }
 
   $('contextBody').innerHTML = `
     <div class="summary">${balanced}</div>
     <div class="kv">
-      <span class="k">Equipo</span><span class="iconrow">${team}</span>
-      <span class="k">Banca</span><span class="iconrow">${bench}</span>
-      <span class="k">Mezcla</span><span class="faint">${comp.adCount} AD · ${comp.apCount} AP · frontline ${comp.frontlineCount} · sustain ${comp.sustainCount} · CC ${comp.hardCcCount}</span>
+      <span class="k">${T('Equipo')}</span><span class="iconrow">${team}</span>
+      <span class="k">${T('Banca')}</span><span class="iconrow">${bench}</span>
+      <span class="k">${T('Mezcla')}</span><span class="faint">${comp.adCount} AD · ${comp.apCount} AP · frontline ${comp.frontlineCount} · sustain ${comp.sustainCount} · CC ${comp.hardCcCount}</span>
     </div>
-    ${missing   ? `<div class="block"><div class="label">Le falta</div><div>${missing}</div></div>` : ''}
-    ${strengths ? `<div class="block"><div class="label">Fortalezas</div><div>${strengths}</div></div>` : ''}
-    <div class="block"><div class="label">Mejor elección de tu banca</div><div class="recitem">${best}</div></div>
-    ${options ? `<div class="block"><div class="label">Opciones (tú + banca)</div><ul class="reclist">${options}</ul></div>` : ''}
+    ${missing   ? `<div class="block"><div class="label">${T('Le falta')}</div><div>${missing}</div></div>` : ''}
+    ${strengths ? `<div class="block"><div class="label">${T('Fortalezas')}</div><div>${strengths}</div></div>` : ''}
+    <div class="block"><div class="label">${T('Mejor elección de tu banca')}</div><div class="recitem">${best}</div></div>
+    ${options ? `<div class="block"><div class="label">${T('Opciones (tú + banca)')}</div><ul class="reclist">${options}</ul></div>` : ''}
     ${buildHtml}`;
 }
 
@@ -1506,17 +1510,53 @@ function dismissSplash() {
   const splash = document.getElementById('splash');
   if (!splash) return;
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const delay = reduce ? 300 : 2200;
+  const delay = reduce ? 300 : 3300;
   setTimeout(() => {
     splash.classList.add('hide');
     setTimeout(() => splash.remove(), 600);
   }, delay);
 }
 
+// --- Idioma (i18n) ------------------------------------------------------
+/** Marca el botón de idioma activo. */
+function markLangButton() {
+  const lang = window.I18N.getLang();
+  document.querySelectorAll('#langSwitch .lang-btn').forEach((b) => {
+    b.classList.toggle('on', b.dataset.lang === lang);
+  });
+}
+
+/** Re-traduce el HTML estático y vuelve a renderizar los paneles dinámicos. */
+function relocalize() {
+  document.documentElement.lang = window.I18N.getLang();
+  window.I18N.applyStatic(document);
+  markLangButton();
+  // Los paneles dinámicos se regeneran con el nuevo idioma.
+  refreshRiotPanels();
+  contextMode = null; // fuerza re-render del contexto en el próximo tick
+  tick();
+}
+
+/** Conecta el selector de idioma del topbar. */
+function setupLangSwitch() {
+  const sw = $('langSwitch');
+  if (!sw) return;
+  sw.addEventListener('click', (e) => {
+    const btn = e.target.closest('.lang-btn');
+    if (!btn || btn.dataset.lang === window.I18N.getLang()) return;
+    window.I18N.setLang(btn.dataset.lang);
+    relocalize();
+  });
+}
+
 // Arranque: primero conocemos el estado del cliente, luego perfil y contexto,
 // así el perfil sabe si mostrar "última sesión".
 async function boot() {
   dismissSplash();
+  document.documentElement.lang = window.I18N.getLang();
+  window.I18N.applyStatic(document);
+  markLangButton();
+  setupLangSwitch();
   await loadCatalog();
   await refreshStatus();
   refreshRiotPanels();

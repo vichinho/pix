@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css?v=25" />
+    <link rel="stylesheet" href="/styles.css?v=26" />
   </head>
   <body>
     <!-- Pantalla de bienvenida (se muestra al lanzar y se desvanece sola) -->
@@ -23,7 +23,7 @@
         <span class="splash-spark s4"></span>
       </div>
       <div class="splash-word">PIX</div>
-      <div class="splash-tag">Tu hada compañera en la Grieta</div>
+      <div class="splash-tag" data-i18n="Tu hada compañera en la Grieta">Tu hada compañera en la Grieta</div>
     </div>
 
     <header class="topbar">
@@ -32,8 +32,12 @@
         <span class="brand-name">PIX</span>
       </div>
       <div class="topbar-right">
+        <div class="lang-switch" id="langSwitch" role="group" aria-label="Idioma">
+          <button type="button" class="lang-btn" data-lang="es">ES</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+        </div>
         <div class="status-group">
-          <span id="clientBadge" class="pill">Cliente</span>
+          <span id="clientBadge" class="pill" data-i18n="Cliente">Cliente</span>
           <span id="riotBadge" class="pill">Riot API</span>
         </div>
       </div>
@@ -64,7 +68,7 @@
         <!-- Maestría de campeones -->
         <section class="card" id="masteryCard" hidden>
           <div class="card-header">
-            <span class="card-title">Maestría de campeones</span>
+            <span class="card-title" data-i18n="Maestría de campeones">Maestría de campeones</span>
           </div>
           <div id="masteryBody" class="muted text-sm">—</div>
         </section>
@@ -72,7 +76,7 @@
         <!-- Resumen de la última partida -->
         <section class="card" id="lastGameCard" hidden>
           <div class="card-header">
-            <span class="card-title">Tu última partida</span>
+            <span class="card-title" data-i18n="Tu última partida">Tu última partida</span>
           </div>
           <div id="lastGameBody" class="text-sm">—</div>
         </section>
@@ -80,7 +84,7 @@
         <!-- Rendimiento -->
         <section class="card">
           <div class="card-header">
-            <span class="card-title">Rendimiento reciente</span>
+            <span class="card-title" data-i18n="Rendimiento reciente">Rendimiento reciente</span>
           </div>
           <div id="statsBody" class="muted text-sm">—</div>
         </section>
@@ -88,22 +92,22 @@
         <!-- Historial de partidas -->
         <section class="card match-history-card">
           <div class="card-header">
-            <span class="card-title">Historial de partidas</span>
+            <span class="card-title" data-i18n="Historial de partidas">Historial de partidas</span>
             <span id="matchPageInfo" class="match-page-info"></span>
           </div>
           <div class="match-filter">
-            <select id="matchQueueFilter" class="match-filter-select" aria-label="Filtrar por modo">
-              <option value="">Todos los modos</option>
-              <option value="450">ARAM</option>
-              <option value="ranked">Clasificatoria</option>
-              <option value="normal">Normal</option>
+            <select id="matchQueueFilter" class="match-filter-select" data-i18n-al="Filtrar por modo" aria-label="Filtrar por modo">
+              <option value="" data-i18n="Todos los modos">Todos los modos</option>
+              <option value="450" data-i18n="ARAM">ARAM</option>
+              <option value="ranked" data-i18n="Clasificatoria">Clasificatoria</option>
+              <option value="normal" data-i18n="Normal">Normal</option>
             </select>
           </div>
           <div id="matchesBody" class="muted text-sm">—</div>
           <div id="matchPagination" class="match-pagination" hidden>
-            <button id="matchPrevBtn" class="pag-btn" disabled aria-label="Página anterior">‹</button>
+            <button id="matchPrevBtn" class="pag-btn" disabled data-i18n-al="Página anterior" aria-label="Página anterior">‹</button>
             <span id="matchPageLabel" class="pag-label">1 / 1</span>
-            <button id="matchNextBtn" class="pag-btn" disabled aria-label="Página siguiente">›</button>
+            <button id="matchNextBtn" class="pag-btn" disabled data-i18n-al="Página siguiente" aria-label="Página siguiente">›</button>
           </div>
         </section>
 
@@ -113,11 +117,11 @@
         <div class="card context-card">
           <div class="context-header">
             <div class="context-title-group">
-              <h2 id="contextTitle" class="context-title">Contexto</h2>
+              <h2 id="contextTitle" class="context-title" data-i18n="Contexto">Contexto</h2>
               <span id="queueBadge" class="pill ghost">—</span>
             </div>
           </div>
-          <div id="contextBody" class="context-body hint">
+          <div id="contextBody" class="context-body hint" data-i18n-html="context-intro">
             Abre el cliente de LoL y entra a una partida. En <strong>selección de
             campeón</strong> verás los campeones recomendados para tu línea y las
             runas de tu pick; ya <strong>en partida</strong>, tu build completa.
@@ -126,11 +130,12 @@
       </section>
     </main>
 
-    <footer class="legal">
+    <footer class="legal" data-i18n-html="footer-legal">
       Proyecto personal no oficial · No afiliado ni patrocinado por Riot Games · League of Legends es marca registrada de Riot Games, Inc.
     </footer>
 
-    <script src="/champion-tips.js?v=25"></script>
-    <script src="/app.js?v=25"></script>
+    <script src="/i18n.js?v=26"></script>
+    <script src="/champion-tips.js?v=26"></script>
+    <script src="/app.js?v=26"></script>
   </body>
 </html>

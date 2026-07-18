@@ -245,9 +245,19 @@ tests/                # Tests unitarios (Vitest)
 docs/                 # Arquitectura y decisiones
 ```
 
+## Idiomas (i18n)
+
+La interfaz está disponible en **español e inglés**, con un selector ES/EN en la
+barra superior (se recuerda entre sesiones). El sistema vive en `public/i18n.js`
+con el patrón "texto como clave": el español es la clave y el fallback, y solo se
+sustituye por inglés cuando corresponde. Los datos de campeones/objetos vienen de
+Data Dragon en el idioma configurado en el backend; los consejos curados por
+campeón (`public/champion-tips.js`) están por ahora solo en español.
+
 ## Próximos pasos
 
 Integrar Riot API (perfil + historial), lectura de la sesión de champion select,
-motor de recomendaciones por reglas y proveedor de builds con fallback local — ya
-implementados. Pendiente de cara a publicar: internacionalización (ES/EN), firma
-de código de los instaladores y auto-actualización.
+motor de recomendaciones por reglas y proveedor de builds con fallback local, app
+de escritorio (Electron) e internacionalización ES/EN — ya implementados. Pendiente
+de cara a publicar: traducir los consejos por campeón al inglés, firma de código de
+los instaladores y auto-actualización.
