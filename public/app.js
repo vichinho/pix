@@ -514,6 +514,82 @@ function renderStatsFromMatches() {
     <table><thead><tr><th>Campeón</th><th>P</th><th>WR</th><th>KDA</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+// --- Resumen de la última partida ---------------------------------------
+const kdaOf = (x) => (x.deaths === 0 ? x.kills + x.assists : (x.kills + x.assists) / x.deaths);
+const csmOf = (x) => (x.durationSec ? x.cs / (x.durationSec / 60) : 0);
+const isAramQueue = (q) => q === 450 || q === 2400 || q === 2300;
+
+/**
+ * Genera un resumen en lenguaje natural de la última partida, comparándola con
+ * el promedio de las anteriores, y un consejo sobre el punto más flojo.
+ */
+function renderLastGameSummary() {
+  const card = $('lastGameCard');
+  const body = $('lastGameBody');
+  const all = matchState.all;
+  if (!all || !all.length) { if (card) card.hidden = true; return; }
+  const m = all[0];
+  const prior = all.slice(1, 20);
+  const avg = (fn) => (prior.length ? prior.reduce((s, x) => s + fn(x), 0) / prior.length : fn(m));
+  const aram = isAramQueue(m.queueId);
+
+  const kda = kdaOf(m);
+  const kdaTxt = m.deaths === 0 ? 'KDA perfecto' : `KDA ${kda.toFixed(2)}`;
+  const resultTxt = m.win ? '🏆 Victoria' : '💀 Derrota';
+  const champ = m.championName || champName(m.championId);
+  const dur = fmtDuration(m.durationSec || 0);
+
+  // Frase principal.
+  const head = `${resultTxt} con <b>${esc(champ)}</b> · ${m.kills}/${m.deaths}/${m.assists} (${kdaTxt}) · ${dur}`;
+
+  // Métricas y comparación con el promedio.
+  const lines = [];
+  if (kda >= 3.5) lines.push('Gran KDA, jugaste muy limpio. 👏');
+  else if (m.deaths >= 8 || (kda < 1.5 && m.deaths >= 5)) lines.push('Moriste bastante — busca pelear con ventaja y respeta el rango enemigo.');
+
+  if (!aram) {
+    const csm = csmOf(m);
+    const csmAvg = avg(csmOf);
+    if (csm > 0) {
+      const cmp = csm < csmAvg - 0.8 ? ' (por debajo de tu promedio)' : csm > csmAvg + 0.8 ? ' (mejor que tu promedio)' : '';
+      lines.push(`Farmeo: ${csm.toFixed(1)} cs/min${cmp}.`);
+    }
+  }
+  if (m.damage) {
+    const dmgAvg = avg((x) => x.damage || 0);
+    const cmp = m.damage < dmgAvg * 0.75 ? ' (bajo para tu campeón)' : m.damage > dmgAvg * 1.2 ? ' (excelente)' : '';
+    lines.push(`Daño a campeones: ${Math.round(m.damage).toLocaleString('es')}${cmp}.`);
+  }
+
+  // Consejo: el punto más flojo respecto al promedio.
+  const tip = lastGameTip(m, avg, aram);
+
+  card.hidden = false;
+  body.innerHTML = `
+    <div class="lg-head">${head}</div>
+    ${lines.length ? `<ul class="lg-lines">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
+    ${tip ? `<div class="lg-tip">💡 ${esc(tip)}</div>` : ''}`;
+}
+
+/** Elige un consejo según el punto más flojo de la partida vs el promedio. */
+function lastGameTip(m, avg, aram) {
+  const kda = kdaOf(m);
+  const kdaAvg = avg(kdaOf);
+  if (m.deaths >= 8) return 'Demasiadas muertes: cada muerte le da oro y tempo al rival. Prioriza sobrevivir sobre forzar jugadas.';
+  if (kda < kdaAvg * 0.7) return 'Tu KDA bajó respecto a tu media: elige mejor las peleas y no entres en desventaja numérica.';
+  if (!aram) {
+    const csm = csmOf(m);
+    if (csm > 0 && csm < avg(csmOf) - 1) return 'Tu farmeo bajó: no descuides los súbditos entre jugadas, el oro constante marca la diferencia.';
+  }
+  if (m.damage && m.damage < avg((x) => x.damage || 0) * 0.7) {
+    return 'Tu daño fue bajo: posiciónate para poder pegar en las peleas y aprovecha tus power-spikes de ítems.';
+  }
+  if ((m.visionScore || 0) > 0 && m.role === 'UTILITY' && m.visionScore < avg((x) => x.visionScore || 0) * 0.7) {
+    return 'Como soporte, sube tu visión: coloca y limpia guardianes alrededor de los objetivos.';
+  }
+  return m.win ? 'Buen trabajo — mantén esta consistencia y sigue revisando tus power-spikes.' : 'Cabeza fría: analiza una cosa a mejorar por partida y a por la siguiente.';
+}
+
 // --- Maestría de campeones ----------------------------------------------
 let masteryList = [];
 
@@ -744,6 +820,7 @@ async function refreshMatches() {
   matchState.page = 0;
   renderMatchPage();
   renderStatsFromMatches();
+  renderLastGameSummary();
 
   // Tanda completa en segundo plano (el backend cachea, así que sólo trae las
   // partidas nuevas). Al terminar, refresca historial y estadísticas.
@@ -752,6 +829,7 @@ async function refreshMatches() {
     matchState.all = full.data.matches;
     renderMatchPage();
     renderStatsFromMatches();
+    renderLastGameSummary();
   }
 }
 

@@ -1096,3 +1096,13 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 .item-comps img { width: 26px; height: 26px; border-radius: 4px; }
 .item-comps .ic-plus { color: var(--faint); font-size: 0.72rem; }
 .item-comps .ic-name { font-size: 0.66rem; color: var(--muted); }
+
+/* Resumen de la última partida */
+.lg-head { font-size: 0.86rem; color: var(--text); margin-bottom: 0.5rem; }
+.lg-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.lg-lines li { font-size: 0.78rem; color: var(--muted); }
+.lg-tip {
+  margin-top: 0.6rem; font-size: 0.78rem; color: var(--text);
+  background: var(--panel-3); border-left: 2px solid var(--accent);
+  border-radius: var(--radius-xs); padding: 0.5rem 0.6rem;
+}
