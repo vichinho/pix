@@ -149,19 +149,35 @@ function iconOrText(entry, cls) {
   if (entry.icon) return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" data-tip="${tip}" loading="lazy"/>`;
   return `<span class="tagfallback" data-tip="${tip}">${esc(entry.name)}</span>`;
 }
-/** Celda de ítem: icono + popover de componentes (ruta de construcción) al pulsar. */
+/** Icono pequeño de un componente (con sus sub-componentes si los tiene). */
+function buildPathNode(node) {
+  const img = node.icon
+    ? `<img src="${esc(node.icon)}" alt="${esc(node.name)}" data-tip="${esc(node.name)}" loading="lazy"/>`
+    : `<span class="ic-name">${esc(node.name)}</span>`;
+  const sub = (node.components && node.components.length)
+    ? `<div class="bp-sub">${node.components.map((s) =>
+        s.icon ? `<img src="${esc(s.icon)}" alt="${esc(s.name)}" data-tip="${esc(s.name)}" loading="lazy"/>` : '',
+      ).join('')}</div>`
+    : '';
+  return `<div class="bp-comp"><div class="bp-comp-main">${img}<span class="bp-name">${esc(node.name)}</span></div>${sub}</div>`;
+}
+
+/** Celda de ítem: icono + popover con el ÁRBOL de construcción al pulsar. */
 function itemCell(it) {
   const tip = esc(tipText(it));
   const inner = it.icon
     ? `<img class="iicon" src="${esc(it.icon)}" alt="${esc(it.name)}" data-tip="${tip}" loading="lazy"/>`
     : `<span class="tagfallback" data-tip="${tip}">${esc(it.name)}</span>`;
-  const comps = (it.components && it.components.length)
-    ? `<span class="item-comps" hidden>${it.components.map((c) =>
-        c.icon
-          ? `<img src="${esc(c.icon)}" alt="${esc(c.name)}" data-tip="${esc(c.name)}" loading="lazy"/>`
-          : `<span class="ic-name">${esc(c.name)}</span>`,
-      ).join('<span class="ic-plus">+</span>')}</span>`
-    : '';
+  let comps = '';
+  if (it.components && it.components.length) {
+    const finalImg = it.icon ? `<img src="${esc(it.icon)}" alt="${esc(it.name)}" loading="lazy"/>` : '';
+    const tree = it.components.map(buildPathNode).join('<span class="bp-plus">+</span>');
+    comps = `<div class="item-comps" hidden>
+      <div class="bp-final">${finalImg}<span class="bp-final-name">${esc(it.name)}</span></div>
+      <div class="bp-down">▾</div>
+      <div class="bp-comps">${tree}</div>
+    </div>`;
+  }
   return `<span class="item-wrap ${comps ? 'has-comps' : ''}">${inner}${comps}</span>`;
 }
 const itemRow = (items) => (items || []).map(itemCell).join(' ');

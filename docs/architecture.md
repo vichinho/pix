@@ -1,6 +1,6 @@
 # Arquitectura
 
-LoL Companion sigue una arquitectura **local-first** con capas limpias. El backend
+PIX sigue una arquitectura **local-first** con capas limpias. El backend
 local expone una API HTTP consumida por la UI (React/Electron en fases futuras).
 
 ## Capas

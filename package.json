@@ -1,8 +1,8 @@
 {
-  "name": "lol-companion",
+  "name": "pix",
   "version": "0.1.0",
   "private": true,
-  "description": "Companion app personal para League of Legends: detecta el estado del cliente, muestra perfil e historial y asiste durante champion select. No afiliado ni patrocinado por Riot Games.",
+  "description": "PIX: companion app personal para League of Legends. Detecta el estado del cliente, muestra perfil e historial y asiste durante champion select. No afiliado ni patrocinado por Riot Games.",
   "type": "module",
   "engines": {
     "node": ">=20"

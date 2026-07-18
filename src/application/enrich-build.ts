@@ -10,10 +10,16 @@ export interface EnrichedIcon {
   desc?: string;
 }
 
+/** Nodo del árbol de construcción de un ítem (recursivo). */
+export interface EnrichedItemNode extends EnrichedIcon {
+  id: number;
+  components?: EnrichedItemNode[];
+}
+
 export interface EnrichedItem extends EnrichedIcon {
   id: number;
-  /** Componentes de los que se arma el ítem (un nivel), con icono. */
-  components?: EnrichedIcon[];
+  /** Árbol de componentes de los que se arma el ítem (hasta 2 niveles). */
+  components?: EnrichedItemNode[];
 }
 
 export interface EnrichedAbility extends EnrichedIcon {
@@ -117,14 +123,22 @@ export async function enrichBuild(
   const passiveBase = data?.passiveIconBase ?? null;
   const shardBase = data?.shardIconBase ?? null;
 
-  const componentIcon = (compId: number): EnrichedIcon => {
+  const resolveComponent = (compId: number, depth: number): EnrichedItemNode => {
     const c = catalog.getItemSync(compId);
-    return { name: c?.name ?? `#${compId}`, icon: c && itemBase ? `${itemBase}${c.image}` : null };
+    const node: EnrichedItemNode = {
+      id: compId,
+      name: c?.name ?? `#${compId}`,
+      icon: c && itemBase ? `${itemBase}${c.image}` : null,
+    };
+    if (depth > 0 && c?.from?.length) {
+      node.components = c.from.map((sub) => resolveComponent(sub, depth - 1));
+    }
+    return node;
   };
   const resolveItems = (ids: number[]): EnrichedItem[] =>
     ids.map((id) => {
       const it = catalog.getItemSync(id);
-      const components = it?.from?.map(componentIcon) ?? [];
+      const components = it?.from?.map((sub) => resolveComponent(sub, 1)) ?? [];
       const parts = components.map((c) => c.name).join(' + ');
       const desc = it?.desc
         ? parts ? `${it.desc} · Se arma de: ${parts}` : it.desc

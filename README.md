@@ -1,4 +1,4 @@
-# LoL Companion
+# PIX
 
 Companion app personal para **League of Legends**. Detecta el estado del cliente,
 muestra perfil e historial reciente y asiste durante champion select con
@@ -8,7 +8,7 @@ Este repositorio contiene el **núcleo backend** del proyecto (Fase 0 → Fase 1
 [especificación](docs/architecture.md)). El primer módulo implementado por completo
 es la **detección del cliente** (LCU), con contratos tipados, API local y tests.
 
-> **Aviso legal:** LoL Companion es un proyecto personal **no oficial**. No está
+> **Aviso legal:** PIX es un proyecto personal **no oficial**. No está
 > afiliado, asociado, autorizado ni patrocinado por Riot Games. League of Legends
 > y Riot Games son marcas registradas de Riot Games, Inc. La app es una herramienta
 > de apoyo visual y consulta: no lee memoria del juego, no inyecta código, no

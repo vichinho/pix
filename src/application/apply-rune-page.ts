@@ -18,7 +18,7 @@ export class ApplyRunePageUseCase {
     if (!build) throw new Error('no_build');
     const r = build.runes;
     const selectedPerkIds = [r.keystoneId, ...r.primary, ...r.secondary, ...r.shards];
-    const name = `${championName || build.championName} · LoL Companion`.slice(0, 75);
+    const name = `${championName || build.championName} · PIX`.slice(0, 75);
     await this.writer.apply({
       name,
       primaryStyleId: r.primaryStyleId,
