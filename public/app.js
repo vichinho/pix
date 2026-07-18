@@ -149,7 +149,22 @@ function iconOrText(entry, cls) {
   if (entry.icon) return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" title="${tip}" loading="lazy"/>`;
   return `<span class="tagfallback" title="${tip}">${esc(entry.name)}</span>`;
 }
-const itemRow = (items) => (items || []).map((i) => iconOrText(i, 'iicon')).join(' ');
+/** Celda de ítem: icono + popover de componentes (ruta de construcción) al pulsar. */
+function itemCell(it) {
+  const tip = esc(tipText(it));
+  const inner = it.icon
+    ? `<img class="iicon" src="${esc(it.icon)}" alt="${esc(it.name)}" title="${tip}" loading="lazy"/>`
+    : `<span class="tagfallback" title="${tip}">${esc(it.name)}</span>`;
+  const comps = (it.components && it.components.length)
+    ? `<span class="item-comps" hidden>${it.components.map((c) =>
+        c.icon
+          ? `<img src="${esc(c.icon)}" alt="${esc(c.name)}" title="${esc(c.name)}" loading="lazy"/>`
+          : `<span class="ic-name">${esc(c.name)}</span>`,
+      ).join('<span class="ic-plus">+</span>')}</span>`
+    : '';
+  return `<span class="item-wrap ${comps ? 'has-comps' : ''}">${inner}${comps}</span>`;
+}
+const itemRow = (items) => (items || []).map(itemCell).join(' ');
 const summRow = (sums)  => (sums  || []).map((s) => iconOrText(s, 'sicon')).join(' ');
 function abilityRow(abils) {
   return (abils || []).map((a) => {
@@ -981,6 +996,19 @@ async function applyRunes(btn) {
 document.addEventListener('click', (e) => {
   const btn = e.target.closest && e.target.closest('.apply-runes');
   if (btn && !btn.disabled) applyRunes(btn);
+});
+
+// Ruta de construcción: al pulsar un ítem, muestra/oculta sus componentes.
+document.addEventListener('click', (e) => {
+  const wrap = e.target.closest && e.target.closest('.item-wrap.has-comps');
+  // Cierra los popovers de otros ítems.
+  document.querySelectorAll('.item-comps:not([hidden])').forEach((el) => {
+    if (!wrap || !wrap.contains(el)) el.hidden = true;
+  });
+  if (wrap) {
+    const c = wrap.querySelector('.item-comps');
+    if (c) c.hidden = !c.hidden;
+  }
 });
 
 async function refreshChampSelect() {

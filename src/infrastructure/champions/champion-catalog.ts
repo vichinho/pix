@@ -61,6 +61,8 @@ export interface ItemEntry {
   name: string;
   image: string;
   desc?: string;
+  /** IDs de los componentes de los que se arma este ítem (un nivel). */
+  from?: number[];
 }
 
 export interface AbilityAsset {
@@ -256,7 +258,13 @@ export class ChampionCatalog {
       this.items = new Map(
         Object.entries(raw.data).map(([id, v]) => [
           Number(id),
-          { id: Number(id), name: v.name, image: v.image.full, desc: stripHtml(v.plaintext || v.description) },
+          {
+            id: Number(id),
+            name: v.name,
+            image: v.image.full,
+            desc: stripHtml(v.plaintext || v.description),
+            ...(v.from && v.from.length ? { from: v.from.map(Number) } : {}),
+          },
         ]),
       );
       this.itemsLoadedAt = Date.now();
@@ -269,7 +277,10 @@ export class ChampionCatalog {
     version: string,
     locale: string,
   ): Promise<{
-    data: Record<string, { name: string; image: { full: string }; plaintext?: string; description?: string }>;
+    data: Record<
+      string,
+      { name: string; image: { full: string }; plaintext?: string; description?: string; from?: string[] }
+    >;
   }> {
     return this.fetchJson(`${DDRAGON}/cdn/${version}/data/${locale}/item.json`);
   }

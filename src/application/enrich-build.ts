@@ -12,6 +12,8 @@ export interface EnrichedIcon {
 
 export interface EnrichedItem extends EnrichedIcon {
   id: number;
+  /** Componentes de los que se arma el ítem (un nivel), con icono. */
+  components?: EnrichedIcon[];
 }
 
 export interface EnrichedAbility extends EnrichedIcon {
@@ -115,14 +117,24 @@ export async function enrichBuild(
   const passiveBase = data?.passiveIconBase ?? null;
   const shardBase = data?.shardIconBase ?? null;
 
+  const componentIcon = (compId: number): EnrichedIcon => {
+    const c = catalog.getItemSync(compId);
+    return { name: c?.name ?? `#${compId}`, icon: c && itemBase ? `${itemBase}${c.image}` : null };
+  };
   const resolveItems = (ids: number[]): EnrichedItem[] =>
     ids.map((id) => {
       const it = catalog.getItemSync(id);
+      const components = it?.from?.map(componentIcon) ?? [];
+      const parts = components.map((c) => c.name).join(' + ');
+      const desc = it?.desc
+        ? parts ? `${it.desc} · Se arma de: ${parts}` : it.desc
+        : parts ? `Se arma de: ${parts}` : '';
       return {
         id,
         name: it?.name ?? `#${id}`,
         icon: it && itemBase ? `${itemBase}${it.image}` : null,
-        ...(it?.desc ? { desc: it.desc } : {}),
+        ...(desc ? { desc } : {}),
+        ...(components.length ? { components } : {}),
       };
     });
 
