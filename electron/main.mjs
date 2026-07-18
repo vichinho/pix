@@ -6,7 +6,7 @@
 // datos del sistema operativo, no dentro del paquete de la app (que es de solo
 // lectura). Así la clave de la Riot API y el historial sobreviven a las
 // actualizaciones.
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -31,11 +31,16 @@ async function boot() {
   return port;
 }
 
+// Color de la app para la barra de título integrada, y color de la esquina del
+// splash para fundir los botones de ventana durante la animación de bienvenida.
+const TITLEBAR_APP = { color: '#0a0b0f', symbolColor: '#e8eaf0', height: 52 };
+const TITLEBAR_SPLASH = { color: '#110923', symbolColor: '#110923', height: 52 };
+
 function createWindow(port) {
   // Barra de título integrada al tema oscuro: ocultamos la nativa y pintamos la
   // zona de los botones de ventana con el color de la app (Windows/macOS).
-  const integratedTitleBar =
-    process.platform === 'win32' || process.platform === 'darwin';
+  const isWin = process.platform === 'win32';
+  const integratedTitleBar = isWin || process.platform === 'darwin';
 
   const win = new BrowserWindow({
     width: 1180,
@@ -49,14 +54,23 @@ function createWindow(port) {
     ...(integratedTitleBar
       ? {
           titleBarStyle: 'hidden',
-          titleBarOverlay: { color: '#0a0b0f', symbolColor: '#e8eaf0', height: 52 },
+          // Durante la bienvenida los botones se funden con el splash (en Windows,
+          // donde el color/símbolo son configurables); al terminar aparecen.
+          titleBarOverlay: isWin ? TITLEBAR_SPLASH : TITLEBAR_APP,
         }
       : {}),
     webPreferences: {
       // La UI es una web estática servida localmente; no necesita acceso a Node.
       nodeIntegration: false,
       contextIsolation: true,
+      preload: join(here, 'preload.cjs'),
     },
+  });
+
+  // Al terminar la animación, la UI avisa y revelamos los botones de ventana.
+  ipcMain.removeAllListeners('pix:splash-done');
+  ipcMain.on('pix:splash-done', () => {
+    if (isWin && !win.isDestroyed()) win.setTitleBarOverlay(TITLEBAR_APP);
   });
 
   win.loadURL(`http://127.0.0.1:${port}`);

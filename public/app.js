@@ -1521,6 +1521,9 @@ function dismissSplash() {
   const delay = reduce ? 300 : 3300;
   setTimeout(() => {
     splash.classList.add('hide');
+    // En la app de escritorio, avisa para que los botones de ventana aparezcan
+    // (durante la animación estaban fundidos con el splash).
+    if (window.pixDesktop) window.pixDesktop.splashDone();
     setTimeout(() => splash.remove(), 600);
   }, delay);
 }
