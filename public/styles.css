@@ -1144,3 +1144,22 @@ tbody tr:hover td { background: rgba(255,255,255,0.015); }
 }
 .lane-pill:hover { border-color: var(--accent); color: var(--text); }
 .lane-pill.on { background: var(--accent); color: #16130a; border-color: var(--accent); font-weight: 600; }
+
+/* Banner con splash art del campeón */
+.build-banner {
+  position: relative; height: 100px; border-radius: var(--radius-sm);
+  background-size: cover; background-position: 50% 25%;
+  background-color: var(--panel-3); border: 1px solid var(--border-soft);
+  overflow: hidden; margin-bottom: 0.85rem;
+}
+.build-banner::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(10,11,15,0) 25%, rgba(10,11,15,0.55) 65%, rgba(10,11,15,0.9) 100%);
+}
+.build-banner.no-splash::after { background: none; }
+.bb-name {
+  position: absolute; left: 0.85rem; bottom: 0.55rem; z-index: 1;
+  font-size: 1.15rem; font-weight: 700; color: #fff; letter-spacing: 0.3px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.85);
+}
+.build-banner.no-splash .bb-name { color: var(--text); text-shadow: none; }

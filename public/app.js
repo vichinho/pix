@@ -133,6 +133,16 @@ function champIconUrl(id) {
   return (e && iconBase) ? `${iconBase}${e.image}` : null;
 }
 
+/** URL del splash art (banner ancho) del campeón, o null. */
+function champSplashUrl(id) {
+  const e = catalogById.get(Number(id));
+  if (!e || !iconBase) return null;
+  const ddragonId = e.image.replace(/\.png$/, '');
+  // iconBase: .../cdn/{ver}/img/champion/ → splash: .../cdn/img/champion/splash/
+  const base = iconBase.replace(/cdn\/[^/]+\/img\/champion\/$/, 'cdn/img/champion/splash/');
+  return `${base}${ddragonId}_0.jpg`;
+}
+
 /** Nombre del campeón desde el catálogo. */
 function champName(id) {
   const e = catalogById.get(Number(id));
@@ -869,8 +879,8 @@ initMatchClicks();
 // --- Build --------------------------------------------------------------
 function renderBuild(b) {
   return `
+    ${buildBanner(b)}
     <div class="kv">
-      <span class="k">Campeón</span><span>${champChip(b.championId, 22)} · ${esc(ROLE_ES[b.role] || b.role)}</span>
       <span class="k">Hechizos</span><span class="iconrow">${summRow(b.summoners)}</span>
       <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
     </div>
@@ -1068,6 +1078,14 @@ function renderRunesSummoners(b) {
   ${renderSkillMatrix(b)}
   <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
   <div class="source-note">${buildMeta(b)}</div>`;
+}
+
+/** Banner con el splash art del campeón y su nombre. */
+function buildBanner(b) {
+  const url = champSplashUrl(b.championId);
+  const bg = url ? `style="background-image:url('${esc(url)}')"` : '';
+  const name = esc(b.championName || champName(b.championId));
+  return `<div class="build-banner ${url ? '' : 'no-splash'}" ${bg}><span class="bb-name">${name}</span></div>`;
 }
 
 /** Botón para aplicar la página de runas en el cliente de LoL (LCU). */
