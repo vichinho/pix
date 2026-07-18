@@ -1,0 +1,18 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke="currentColor" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Wings -->
+    <path d="M256,262 C198,230 146,236 112,272 C136,304 198,304 256,282 Z"/>
+    <path d="M256,262 C314,230 366,236 400,272 C376,304 314,304 256,282 Z"/>
+    <!-- Body -->
+    <ellipse cx="256" cy="300" rx="58" ry="66"/>
+    <!-- Sparkle crown -->
+    <path d="M256,180 C258,200 258,200 280,209 C258,218 258,218 256,238 C254,218 254,218 232,209 C254,200 254,200 256,180 Z" stroke-width="8"/>
+  </g>
+  <!-- Eyes (filled, not stroked) -->
+  <circle cx="235" cy="272" r="5.5" fill="currentColor" stroke="none"/>
+  <circle cx="277" cy="272" r="5.5" fill="currentColor" stroke="none"/>
+  <!-- Dust trail -->
+  <circle cx="188" cy="176" r="9" fill="currentColor" stroke="none" opacity="0.85"/>
+  <circle cx="162" cy="146" r="5.5" fill="currentColor" stroke="none" opacity="0.65"/>
+  <circle cx="145" cy="120" r="3" fill="currentColor" stroke="none" opacity="0.45"/>
+</svg>

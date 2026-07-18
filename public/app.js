@@ -1498,9 +1498,25 @@ async function tick() {
   await refreshContext(status?.clientState);
 }
 
+/**
+ * Oculta la pantalla de bienvenida tras dejar que la animación se luzca.
+ * Con "reduce motion" la quitamos casi al instante.
+ */
+function dismissSplash() {
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const delay = reduce ? 300 : 2200;
+  setTimeout(() => {
+    splash.classList.add('hide');
+    setTimeout(() => splash.remove(), 600);
+  }, delay);
+}
+
 // Arranque: primero conocemos el estado del cliente, luego perfil y contexto,
 // así el perfil sabe si mostrar "última sesión".
 async function boot() {
+  dismissSplash();
   await loadCatalog();
   await refreshStatus();
   refreshRiotPanels();

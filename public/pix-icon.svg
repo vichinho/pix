@@ -1,0 +1,39 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A1033"/>
+      <stop offset="100%" stop-color="#2E1856"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8FF0E8"/>
+      <stop offset="100%" stop-color="#F6A6D6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#F6C177" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#F6C177" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <circle cx="256" cy="230" r="180" fill="url(#glow)"/>
+
+  <!-- Dust trail -->
+  <circle cx="188" cy="176" r="10" fill="#F6C177" opacity="0.85"/>
+  <circle cx="162" cy="146" r="6" fill="#F6C177" opacity="0.65"/>
+  <circle cx="145" cy="120" r="3.5" fill="#F6C177" opacity="0.45"/>
+
+  <!-- Wings -->
+  <path d="M256,262 C198,230 146,236 112,272 C136,304 198,304 256,282 Z" fill="#DFF9F5" opacity="0.85"/>
+  <path d="M256,262 C314,230 366,236 400,272 C376,304 314,304 256,282 Z" fill="#DFF9F5" opacity="0.85"/>
+
+  <!-- Body -->
+  <ellipse cx="256" cy="300" rx="58" ry="66" fill="url(#bodyGrad)"/>
+
+  <!-- Eyes -->
+  <circle cx="235" cy="272" r="5.5" fill="#1A1033"/>
+  <circle cx="277" cy="272" r="5.5" fill="#1A1033"/>
+
+  <!-- Sparkle crown -->
+  <path d="M256,180 C258,200 258,200 280,209 C258,218 258,218 256,238 C254,218 254,218 232,209 C254,200 254,200 256,180 Z" fill="#F6C177"/>
+</svg>

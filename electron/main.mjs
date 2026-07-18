@@ -37,8 +37,9 @@ function createWindow(port) {
     height: 820,
     minWidth: 900,
     minHeight: 640,
-    backgroundColor: '#0e0f13',
+    backgroundColor: '#1A1033',
     title: 'PIX',
+    icon: join(here, '..', 'public', 'pix-icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       // La UI es una web estática servida localmente; no necesita acceso a Node.
