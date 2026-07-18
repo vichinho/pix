@@ -146,19 +146,19 @@ function tipText(e, prefix) {
 }
 function iconOrText(entry, cls) {
   const tip = esc(tipText(entry));
-  if (entry.icon) return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" title="${tip}" loading="lazy"/>`;
-  return `<span class="tagfallback" title="${tip}">${esc(entry.name)}</span>`;
+  if (entry.icon) return `<img class="${cls}" src="${esc(entry.icon)}" alt="${esc(entry.name)}" data-tip="${tip}" loading="lazy"/>`;
+  return `<span class="tagfallback" data-tip="${tip}">${esc(entry.name)}</span>`;
 }
 /** Celda de ítem: icono + popover de componentes (ruta de construcción) al pulsar. */
 function itemCell(it) {
   const tip = esc(tipText(it));
   const inner = it.icon
-    ? `<img class="iicon" src="${esc(it.icon)}" alt="${esc(it.name)}" title="${tip}" loading="lazy"/>`
-    : `<span class="tagfallback" title="${tip}">${esc(it.name)}</span>`;
+    ? `<img class="iicon" src="${esc(it.icon)}" alt="${esc(it.name)}" data-tip="${tip}" loading="lazy"/>`
+    : `<span class="tagfallback" data-tip="${tip}">${esc(it.name)}</span>`;
   const comps = (it.components && it.components.length)
     ? `<span class="item-comps" hidden>${it.components.map((c) =>
         c.icon
-          ? `<img src="${esc(c.icon)}" alt="${esc(c.name)}" title="${esc(c.name)}" loading="lazy"/>`
+          ? `<img src="${esc(c.icon)}" alt="${esc(c.name)}" data-tip="${esc(c.name)}" loading="lazy"/>`
           : `<span class="ic-name">${esc(c.name)}</span>`,
       ).join('<span class="ic-plus">+</span>')}</span>`
     : '';
@@ -169,14 +169,14 @@ const summRow = (sums)  => (sums  || []).map((s) => iconOrText(s, 'sicon')).join
 function abilityRow(abils) {
   return (abils || []).map((a) => {
     const tip = esc(tipText(a, `${a.letter} · `));
-    return `<span class="abil" title="${tip}">${a.icon ? `<img class="sicon" src="${esc(a.icon)}" alt="${esc(a.name)}" loading="lazy"/>` : ''}<span class="ablabel">${esc(a.letter)}</span></span>`;
+    return `<span class="abil" data-tip="${tip}">${a.icon ? `<img class="sicon" src="${esc(a.icon)}" alt="${esc(a.name)}" loading="lazy"/>` : ''}<span class="ablabel">${esc(a.letter)}</span></span>`;
   }).join('<span class="arrow">›</span>');
 }
 
 function runeRow(r, extraClass) {
   const tip = esc(tipText(r));
   const img = r.icon ? `<img src="${esc(r.icon)}" alt="${esc(r.name)}" loading="lazy"/>` : '<span class="tagfallback">•</span>';
-  return `<div class="rune ${extraClass || ''}" title="${tip}">${img}<span class="rn">${esc(r.name)}</span></div>`;
+  return `<div class="rune ${extraClass || ''}" data-tip="${tip}">${img}<span class="rn">${esc(r.name)}</span></div>`;
 }
 function styleHead(style) {
   const img = style.icon ? `<img src="${esc(style.icon)}" alt="" loading="lazy"/>` : '';
@@ -184,7 +184,7 @@ function styleHead(style) {
 }
 function renderRunes(runes) {
   const shards = (runes.shards || []).map((s) =>
-    s.icon ? `<img src="${esc(s.icon)}" alt="${esc(s.name)}" title="${esc(s.name)}" loading="lazy"/>` : ''
+    s.icon ? `<img src="${esc(s.icon)}" alt="${esc(s.name)}" data-tip="${esc(s.name)}" loading="lazy"/>` : ''
   ).join('');
   return `<div class="runepage">
     <div class="runecol">
@@ -606,7 +606,7 @@ function masteryTile(m, clickable) {
   const tip = `${champName(m.championId)} · Maestría ${m.level} · ${m.points.toLocaleString('es')} pts`;
   const attrs = clickable ? `data-cid="${esc(m.championId)}"` : '';
   const cls = clickable ? 'mastery-tile clickable' : 'mastery-tile';
-  return `<div class="${cls}" ${attrs} title="${esc(tip)}">${img}<span class="m-lvl">M${esc(m.level)}</span><span class="m-pts">${esc(fmtPoints(m.points))}</span></div>`;
+  return `<div class="${cls}" ${attrs} data-tip="${esc(tip)}">${img}<span class="m-lvl">M${esc(m.level)}</span><span class="m-pts">${esc(fmtPoints(m.points))}</span></div>`;
 }
 
 async function refreshMastery() {
@@ -878,7 +878,7 @@ function buildMeta(b) {
 function passiveChip(p) {
   if (!p) return '';
   const tip = esc(tipText(p, 'Pasiva · '));
-  return `<span class="abil" title="${tip}">${p.icon ? `<img class="sicon" src="${esc(p.icon)}" alt="${esc(p.name)}" loading="lazy"/>` : ''}<span class="ablabel">P</span></span>`;
+  return `<span class="abil" data-tip="${tip}">${p.icon ? `<img class="sicon" src="${esc(p.icon)}" alt="${esc(p.name)}" loading="lazy"/>` : ''}<span class="ablabel">P</span></span>`;
 }
 
 /**
@@ -916,7 +916,7 @@ function renderSkillMatrix(b) {
     const cells = matrix.map((lv, i) =>
       `<div class="sm-cell ${lv === letter ? 'on k-' + letter : ''}">${lv === letter ? i + 1 : ''}</div>`,
     ).join('');
-    return `<div class="sm-row"><div class="sm-key" title="${tip}">${icon}<span class="sm-letter">${letter}</span></div>${cells}</div>`;
+    return `<div class="sm-row"><div class="sm-key" data-tip="${tip}">${icon}<span class="sm-letter">${letter}</span></div>${cells}</div>`;
   }).join('');
   return `<div class="block"><div class="label">Orden de subida de habilidades</div>
     <div class="skill-matrix-wrap"><div class="skill-matrix">${head}${body}</div></div></div>`;
@@ -968,7 +968,7 @@ function renderIdleContext() {
   const tiles = champs.map((c) => {
     const url = iconBase ? `${iconBase}${esc(c.image)}` : '';
     const img = url ? `<img src="${url}" alt="${esc(c.name)}" loading="lazy"/>` : '';
-    return `<button class="champ-tile" data-cid="${esc(c.id)}" title="${esc(c.name)}" data-name="${esc(c.name.toLowerCase())}">${img}<span>${esc(c.name)}</span></button>`;
+    return `<button class="champ-tile" data-cid="${esc(c.id)}" data-tip="${esc(c.name)}" data-name="${esc(c.name.toLowerCase())}">${img}<span>${esc(c.name)}</span></button>`;
   }).join('');
   // Acceso rápido: tus campeones con más maestría (si hay datos de Riot).
   const quick = masteryList.length
@@ -1003,22 +1003,44 @@ function renderIdleContext() {
   });
 }
 
-/** Muestra la build del campeón elegido en el explorador, con botón de volver. */
-async function showIdleBuild(championId) {
+/** Líneas seleccionables en el explorador (valor = rol de la API). */
+const EXPLORER_LANES = [
+  { v: 'TOP', label: 'Top' },
+  { v: 'JUNGLE', label: 'Jungla' },
+  { v: 'MIDDLE', label: 'Mid' },
+  { v: 'BOTTOM', label: 'ADC' },
+  { v: 'UTILITY', label: 'Support' },
+  { v: 'ARAM', label: 'ARAM' },
+];
+
+/** Muestra la build del campeón elegido en el explorador, con selector de línea. */
+async function showIdleBuild(championId, role = 'MIDDLE') {
   const grid = $('champGrid');
   const search = $('champSearch');
   const view = $('champBuildView');
   if (!view) return;
-  view.innerHTML = '<span class="muted">Cargando build…</span>';
   if (grid) grid.style.display = 'none';
   if (search) search.style.display = 'none';
-  const b = await api(`/api/builds?championId=${championId}&role=UNKNOWN`);
-  const back = '<button class="linklike" id="champBack">← volver a la lista</button>';
-  view.innerHTML = back + (b.ok ? renderBuild(b.data) : '<span class="muted">Sin build para este campeón.</span>');
+
+  const lanes = EXPLORER_LANES.map(
+    (l) => `<button class="lane-pill ${l.v === role ? 'on' : ''}" data-role="${l.v}">${esc(l.label)}</button>`,
+  ).join('');
+  const header = `
+    <button class="linklike" id="champBack">← volver a la lista</button>
+    <div class="lane-picker"><span class="lane-label">Línea:</span>${lanes}</div>`;
+
+  view.innerHTML = `${header}<div id="laneBuild"><span class="muted">Cargando build…</span></div>`;
+  const b = await api(`/api/builds?championId=${championId}&role=${encodeURIComponent(role)}`);
+  $('laneBuild').innerHTML = b.ok ? renderBuild(b.data) : '<span class="muted">Sin build para este campeón.</span>';
+
   $('champBack').addEventListener('click', () => {
     view.innerHTML = '';
     if (grid) grid.style.display = '';
     if (search) { search.style.display = ''; search.focus(); }
+  });
+  view.querySelector('.lane-picker').addEventListener('click', (e) => {
+    const pill = e.target.closest('.lane-pill');
+    if (pill && pill.dataset.role !== role) showIdleBuild(championId, pill.dataset.role);
   });
 }
 
@@ -1088,6 +1110,45 @@ document.addEventListener('click', (e) => {
     if (c) c.hidden = !c.hidden;
   }
 });
+
+// --- Tooltip personalizado (reemplaza el nativo del navegador) -----------
+const tooltipEl = document.createElement('div');
+tooltipEl.className = 'tooltip';
+tooltipEl.hidden = true;
+document.body.appendChild(tooltipEl);
+let tipTarget = null;
+
+function showTip(el) {
+  const raw = el.dataset.tip || '';
+  if (!raw) { hideTip(); return; }
+  const idx = raw.indexOf(' — ');
+  tooltipEl.innerHTML = idx >= 0
+    ? `<span class="tt-name">${esc(raw.slice(0, idx))}</span><span class="tt-desc">${esc(raw.slice(idx + 3))}</span>`
+    : `<span class="tt-name">${esc(raw)}</span>`;
+  tooltipEl.hidden = false;
+}
+function hideTip() { tooltipEl.hidden = true; tipTarget = null; }
+function positionTip(x, y) {
+  const pad = 14;
+  const r = tooltipEl.getBoundingClientRect();
+  let left = x + pad;
+  let top = y + pad;
+  if (left + r.width > window.innerWidth - 8) left = x - r.width - pad;
+  if (top + r.height > window.innerHeight - 8) top = y - r.height - pad;
+  tooltipEl.style.left = `${Math.max(8, left)}px`;
+  tooltipEl.style.top = `${Math.max(8, top)}px`;
+}
+document.addEventListener('mouseover', (e) => {
+  const t = e.target.closest && e.target.closest('[data-tip]');
+  if (t) {
+    if (t !== tipTarget) { tipTarget = t; showTip(t); }
+    positionTip(e.clientX, e.clientY);
+  } else if (tipTarget) {
+    hideTip();
+  }
+});
+document.addEventListener('mousemove', (e) => { if (tipTarget) positionTip(e.clientX, e.clientY); });
+window.addEventListener('scroll', hideTip, true);
 
 async function refreshChampSelect() {
   $('contextTitle').textContent = 'Champion Select';
