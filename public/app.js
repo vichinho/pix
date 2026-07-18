@@ -3,9 +3,9 @@
 // --- Utilidades ---------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 
-async function api(path) {
+async function api(path, options) {
   try {
-    const res = await fetch(path);
+    const res = await fetch(path, options);
     let data = null;
     try { data = await res.json(); } catch { /* sin JSON */ }
     return { ok: res.ok, status: res.status, data };
@@ -453,6 +453,78 @@ function riotErrorEs(resp) {
   return `No se pudo vincular: ${esc(code || `Error ${resp.status}`)}`;
 }
 
+// --- Onboarding / Ajustes: clave de la Riot API -------------------------
+/**
+ * Formulario de primer uso: cuando el backend no tiene clave de Riot API
+ * configurada (503), guiamos al usuario para conseguirla y pegarla. La clave
+ * se guarda en el servidor (PUT /api/settings) — nunca se muestra de vuelta.
+ */
+function renderApiKeyForm() {
+  return `
+    <div class="apikey-form" style="padding:1.3rem">
+      <div class="apikey-title">Conecta tu Riot API</div>
+      <ol class="apikey-steps">
+        <li>Entra en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> e inicia sesión con tu cuenta de Riot.</li>
+        <li>Copia la <b>Development API Key</b> (empieza por <code>RGAPI-</code>).</li>
+        <li>Pégala aquí abajo. Se guarda en tu equipo, nunca se comparte.</li>
+      </ol>
+      <div class="apikey-note muted">Las claves de desarrollo caducan cada 24 h; cuando expire, repite estos pasos.</div>
+      <div class="link-row">
+        <input id="apiKeyInput" type="password" placeholder="RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          autocomplete="off" spellcheck="false" />
+        <button id="apiKeyBtn" type="button">Guardar</button>
+      </div>
+      <div id="apiKeyMsg" class="link-msg"></div>
+    </div>`;
+}
+
+/** Conecta los eventos del formulario de clave de API tras renderizar. */
+function wireApiKeyForm() {
+  const btn = $('apiKeyBtn');
+  if (!btn) return;
+  const submit = () => submitApiKey();
+  btn.addEventListener('click', submit);
+  const input = $('apiKeyInput');
+  if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+}
+
+/** Valida y guarda la clave de la Riot API en el servidor, luego recarga. */
+async function submitApiKey() {
+  const input = $('apiKeyInput');
+  const msg = $('apiKeyMsg');
+  const key = (input?.value || '').trim();
+  if (!key) {
+    if (msg) { msg.textContent = 'Pega tu clave (empieza por RGAPI-).'; msg.className = 'link-msg err'; }
+    return;
+  }
+  const btn = $('apiKeyBtn');
+  if (btn) btn.disabled = true;
+  if (msg) { msg.textContent = 'Verificando y guardando…'; msg.className = 'link-msg'; }
+
+  const res = await api('/api/settings', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ riotApiKey: key }),
+  });
+  if (btn) btn.disabled = false;
+
+  if (res.ok && res.data?.riotConfigured) {
+    if (msg) { msg.textContent = '¡Listo! Cargando tu perfil…'; msg.className = 'link-msg ok'; }
+    refreshRiotPanels();
+    return;
+  }
+  const code = res.data?.error;
+  if (msg) {
+    if (code === 'riot_api_key_invalid')
+      msg.innerHTML = 'La clave no es válida o expiró. Genera una nueva en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> y vuelve a pegarla.';
+    else if (code === 'invalid_body')
+      msg.textContent = 'El formato de la clave no es válido.';
+    else
+      msg.textContent = `No se pudo guardar: ${esc(code || `Error ${res.status}`)}`;
+    msg.className = 'link-msg err';
+  }
+}
+
 // --- Perfil / stats / partidas -----------------------------------------
 async function refreshRiotPanels() {
   const prof = await api(`/api/player/profile?_=1${riotIdQuery()}`);
@@ -460,10 +532,8 @@ async function refreshRiotPanels() {
     riotConfigured = false;
     $('riotBadge').textContent = 'Riot API off';
     $('riotBadge').className = 'pill off';
-    $('profileBody').innerHTML = `
-      <div style="padding:1.4rem 1.3rem">
-        <span class="hint">Define <code style="font-size:0.8rem;color:var(--accent)">RIOT_API_KEY</code> en <code style="font-size:0.8rem;color:var(--muted)">.env</code> para ver el perfil y estadísticas.</span>
-      </div>`;
+    $('profileBody').innerHTML = renderApiKeyForm();
+    wireApiKeyForm();
     return;
   }
   riotConfigured = true;

@@ -35,11 +35,15 @@ import { GameQueueDetector } from '../infrastructure/lcu/game-queue.js';
 import { AramReader } from '../infrastructure/lcu/aram-reader.js';
 import { SeedChampionPool } from '../infrastructure/champions/seed-champion-pool.js';
 import { SeedChampionTraitProvider } from '../infrastructure/champions/champion-traits.js';
-import { RiotApiError, type RiotApiClient } from '../infrastructure/riot/riot-api-client.js';
+import { RiotApiError, RiotApiClient } from '../infrastructure/riot/riot-api-client.js';
 import {
   MemoryIdentityStore,
   type IdentityStore,
 } from '../infrastructure/persistence/identity-store.js';
+import {
+  MemorySettingsStore,
+  type SettingsStore,
+} from '../infrastructure/persistence/settings-store.js';
 import type { ChampionPool } from '../domain/recommendation.js';
 import type { ChampionTraitProvider } from '../domain/aram.js';
 
@@ -50,8 +54,15 @@ export interface ServerDeps {
   championPool?: ChampionPool;
   aramReader?: AramReader;
   championTraits?: ChampionTraitProvider;
-  /** Cliente Riot API; si es null/ausente, las rutas de perfil/historial devuelven 503. */
+  /** Cliente Riot API inicial; si es null/ausente, se intenta desde ajustes/env. */
   riotClient?: RiotApiClient | null;
+  /** Almacén de ajustes (Riot API key configurable desde la UI). */
+  settingsStore?: SettingsStore;
+  /** Fábrica del cliente Riot al (re)configurar la key desde ajustes. */
+  riotClientFactory?: (apiKey: string, platform: string, region: string) => RiotApiClient;
+  /** Plataforma/región por defecto para el cliente Riot reconstruido. */
+  riotPlatform?: string;
+  riotRegion?: string;
   buildProvider?: BuildProvider;
   /** Escritor de páginas de runas al cliente (LCU). */
   runePageWriter?: RunePageWriter;
@@ -165,47 +176,59 @@ export function createServer(deps: ServerDeps = {}): Express {
   const applyItemSet = new ApplyItemSetUseCase(buildProvider, itemSetWriter);
   const getLiveChampion = new GetLiveChampionUseCase(liveGameReader, championCatalog);
   const getLiveGameState = new GetLiveGameStateUseCase(liveGameReader);
-  const riotClient = deps.riotClient ?? null;
-  const getPlayerProfile = riotClient ? new GetPlayerProfileUseCase(riotClient) : null;
-  const getRecentMatches = riotClient ? new GetRecentMatchesUseCase(riotClient) : null;
-  const getPlayerStats = getRecentMatches ? new GetPlayerStatsUseCase(getRecentMatches) : null;
-  const getPersonalizedRecommendations = getRecentMatches
-    ? new GetPersonalizedRecommendationsUseCase(championPool, getRecentMatches, champSelectReader)
-    : null;
-  const getChampionMastery = riotClient ? new GetChampionMasteryUseCase(riotClient) : null;
+  // La Riot API se puede configurar en caliente (pantalla de Ajustes): la key se
+  // guarda en el SettingsStore y el cliente Riot se reconstruye sin reiniciar.
+  const settingsStore = deps.settingsStore ?? new MemorySettingsStore();
+  const defaultPlatform = deps.riotPlatform ?? 'la1';
+  const defaultRegion = deps.riotRegion ?? 'americas';
+  const makeRiotClient =
+    deps.riotClientFactory ??
+    ((apiKey: string, platform: string, region: string) => new RiotApiClient({ apiKey, platform, region }));
 
-  /**
-   * Devuelve los casos de uso de perfil/partidas enrutados a la plataforma pedida.
-   * Si no se especifica plataforma (o no hay Riot API), usa los de por defecto.
-   */
-  // Casos de uso por plataforma, memorizados: así el cliente enrutado (y sus
-  // cachés de cuenta y de partidas) persiste entre peticiones en vez de crearse
-  // de cero cada vez (clave cuando el usuario siempre envía platform=la2).
+  let riotClient: RiotApiClient | null = deps.riotClient ?? null;
+  if (!riotClient) {
+    const savedKey = settingsStore.get().riotApiKey;
+    if (savedKey) riotClient = makeRiotClient(savedKey, defaultPlatform, defaultRegion);
+  }
+
   type RoutedBundle = {
-    profile: typeof getPlayerProfile;
-    matches: typeof getRecentMatches;
-    stats: typeof getPlayerStats;
-    mastery: typeof getChampionMastery;
+    profile: GetPlayerProfileUseCase;
+    matches: GetRecentMatchesUseCase;
+    stats: GetPlayerStatsUseCase;
+    mastery: GetChampionMasteryUseCase;
+    personalized: GetPersonalizedRecommendationsUseCase;
   };
-  const routedCache = new Map<string, RoutedBundle>();
-  function routedRiot(platform: string | undefined): RoutedBundle {
-    if (!riotClient || !platform || platform.toLowerCase() === riotClient.platform) {
-      return { profile: getPlayerProfile, matches: getRecentMatches, stats: getPlayerStats, mastery: getChampionMastery };
-    }
-    const key = platform.toLowerCase();
-    const hit = routedCache.get(key);
-    if (hit) return hit;
-    const region = PLATFORM_TO_REGION[key] ?? riotClient.region;
-    const client = riotClient.withRouting(key, region);
+  function buildRiotUseCases(client: RiotApiClient): RoutedBundle {
     const matches = new GetRecentMatchesUseCase(client);
-    const bundle: RoutedBundle = {
+    return {
       profile: new GetPlayerProfileUseCase(client),
       matches,
       stats: new GetPlayerStatsUseCase(matches),
       mastery: new GetChampionMasteryUseCase(client),
+      personalized: new GetPersonalizedRecommendationsUseCase(championPool, matches, champSelectReader),
     };
+  }
+
+  // Casos de uso por plataforma, memorizados: así el cliente enrutado (y sus
+  // cachés de cuenta y de partidas) persiste entre peticiones. Devuelve null si
+  // la Riot API no está configurada aún.
+  const routedCache = new Map<string, RoutedBundle>();
+  function routedRiot(platform: string | undefined): RoutedBundle | null {
+    if (!riotClient) return null;
+    const key = platform && platform.toLowerCase() !== riotClient.platform ? platform.toLowerCase() : '__default__';
+    const hit = routedCache.get(key);
+    if (hit) return hit;
+    const client =
+      key === '__default__' ? riotClient : riotClient.withRouting(key, PLATFORM_TO_REGION[key] ?? riotClient.region);
+    const bundle = buildRiotUseCases(client);
     routedCache.set(key, bundle);
     return bundle;
+  }
+
+  /** Reconfigura (o desactiva) la Riot API con una nueva key. */
+  function reconfigureRiot(apiKey: string | undefined): void {
+    riotClient = apiKey ? makeRiotClient(apiKey, defaultPlatform, defaultRegion) : null;
+    routedCache.clear();
   }
 
   const identityStore = deps.identityStore ?? new MemoryIdentityStore();
@@ -353,7 +376,8 @@ export function createServer(deps: ServerDeps = {}): Express {
 
     // Ruta personalizada: combina el pool base con el historial del jugador.
     if (personalized === 'true') {
-      if (!getPersonalizedRecommendations) {
+      const routed = routedRiot(platform);
+      if (!routed) {
         res.status(503).json({ error: 'riot_not_configured' });
         return;
       }
@@ -362,15 +386,9 @@ export function createServer(deps: ServerDeps = {}): Express {
         res.status(400).json({ error: 'identity_unavailable' });
         return;
       }
-      // Enruta el historial a la plataforma del jugador si difiere de la de por defecto.
-      const routedMatches = routedRiot(platform).matches;
-      const personalizedUseCase =
-        routedMatches && routedMatches !== getRecentMatches
-          ? new GetPersonalizedRecommendationsUseCase(championPool, routedMatches, champSelectReader)
-          : getPersonalizedRecommendations;
       try {
         res.json(
-          await personalizedUseCase.execute({
+          await routed.personalized.execute({
             identity,
             ...(role ? { role } : {}),
             ...(limit ? { limit } : {}),
@@ -474,13 +492,14 @@ export function createServer(deps: ServerDeps = {}): Express {
   );
 
   app.get('/api/player/profile', async (req: Request, res: Response) => {
-    if (!getPlayerProfile) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
     const parsed = identityQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const routed = routedRiot(parsed.data.platform);
+    if (!routed) {
+      res.status(503).json({ error: 'riot_not_configured' });
       return;
     }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
@@ -489,20 +508,21 @@ export function createServer(deps: ServerDeps = {}): Express {
       return;
     }
     try {
-      res.json(await routedRiot(parsed.data.platform).profile!.execute(identity));
+      res.json(await routed.profile.execute(identity));
     } catch (err) {
       riotErrorResponse(res, err);
     }
   });
 
   app.get('/api/player/matches', async (req: Request, res: Response) => {
-    if (!getRecentMatches) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
     const parsed = identityQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const routed = routedRiot(parsed.data.platform);
+    if (!routed) {
+      res.status(503).json({ error: 'riot_not_configured' });
       return;
     }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
@@ -515,11 +535,7 @@ export function createServer(deps: ServerDeps = {}): Express {
         ...(parsed.data.queue != null ? { queue: parsed.data.queue } : {}),
         ...(parsed.data.type ? { type: parsed.data.type } : {}),
       };
-      const matches = await routedRiot(parsed.data.platform).matches!.execute(
-        identity,
-        parsed.data.count ?? 10,
-        filter,
-      );
+      const matches = await routed.matches.execute(identity, parsed.data.count ?? 10, filter);
       res.json({ matches });
     } catch (err) {
       riotErrorResponse(res, err);
@@ -527,13 +543,14 @@ export function createServer(deps: ServerDeps = {}): Express {
   });
 
   app.get('/api/player/stats', async (req: Request, res: Response) => {
-    if (!getPlayerStats) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
     const parsed = identityQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const routed = routedRiot(parsed.data.platform);
+    if (!routed) {
+      res.status(503).json({ error: 'riot_not_configured' });
       return;
     }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
@@ -542,20 +559,21 @@ export function createServer(deps: ServerDeps = {}): Express {
       return;
     }
     try {
-      res.json(await routedRiot(parsed.data.platform).stats!.execute(identity, parsed.data.count ?? 20));
+      res.json(await routed.stats.execute(identity, parsed.data.count ?? 20));
     } catch (err) {
       riotErrorResponse(res, err);
     }
   });
 
   app.get('/api/player/mastery', async (req: Request, res: Response) => {
-    if (!getChampionMastery) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
     const parsed = identityQuerySchema.safeParse(req.query);
     if (!parsed.success) {
       res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
+      return;
+    }
+    const routed = routedRiot(parsed.data.platform);
+    if (!routed) {
+      res.status(503).json({ error: 'riot_not_configured' });
       return;
     }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
@@ -564,7 +582,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       return;
     }
     try {
-      const mastery = await routedRiot(parsed.data.platform).mastery!.execute(identity, parsed.data.count ?? 8);
+      const mastery = await routed.mastery.execute(identity, parsed.data.count ?? 8);
       res.json({ mastery });
     } catch (err) {
       riotErrorResponse(res, err);
@@ -646,12 +664,40 @@ export function createServer(deps: ServerDeps = {}): Express {
     }),
   );
 
-  // Rutas planificadas en la especificación, aún no implementadas.
-  const notImplemented = (name: string) => (_req: Request, res: Response) => {
-    res.status(501).json({ error: 'not_implemented', endpoint: name });
-  };
-  app.get('/api/settings', notImplemented('settings'));
-  app.put('/api/settings', notImplemented('settings'));
+  // Ajustes: estado de configuración (nunca devuelve la key) y guardar la key.
+  app.get('/api/settings', (_req: Request, res: Response) => {
+    res.json({ riotConfigured: riotClient != null, hasKey: !!settingsStore.get().riotApiKey });
+  });
+
+  const settingsBodySchema = z.object({ riotApiKey: z.string().trim().min(1).max(120).optional() });
+  app.put(
+    '/api/settings',
+    wrap(async (req: Request, res: Response) => {
+      const parsed = settingsBodySchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() });
+        return;
+      }
+      if (parsed.data.riotApiKey !== undefined) {
+        const key = parsed.data.riotApiKey;
+        // Validamos la key contra la Riot API antes de guardarla, para dar
+        // feedback claro (una cuenta cualquiera vale como prueba de conexión).
+        const probe = makeRiotClient(key, defaultPlatform, defaultRegion);
+        try {
+          await probe.getAccountByRiotId('Riot Phreak', 'NA1');
+        } catch (err) {
+          if (err instanceof RiotApiError && (err.status === 401 || err.status === 403)) {
+            res.status(400).json({ error: 'riot_api_key_invalid' });
+            return;
+          }
+          // Otros errores (404 de la cuenta de prueba, red…) => la key es válida.
+        }
+        settingsStore.set({ riotApiKey: key });
+        reconfigureRiot(key);
+      }
+      res.json({ ok: true, riotConfigured: riotClient != null });
+    }),
+  );
 
   return app;
 }
