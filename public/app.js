@@ -729,7 +729,7 @@ function renderBuild(b) {
       <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
     </div>
     ${renderSkillMatrix(b)}
-    <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
+    <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
     <div class="block"><div class="label">Ítems iniciales</div><div class="iconrow">${itemRow(b.items.starting)}</div></div>
     <div class="block"><div class="label">Core</div><div class="iconrow">${itemRow(b.items.core)}</div></div>
     <div class="block"><div class="label">Situacionales</div><div class="iconrow">${itemRow(b.items.situational)}</div></div>
@@ -885,9 +885,53 @@ function renderRunesSummoners(b) {
     <span class="k">Habilidades</span><span class="iconrow">${passiveChip(b.passive)}${b.passive ? '<span class="arrow">·</span>' : ''}${abilityRow(b.abilities)}</span>
   </div>
   ${renderSkillMatrix(b)}
-  <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}</div>
+  <div class="block"><div class="label">Runas</div>${renderRunes(b.runes)}${applyRunesBtn(b)}</div>
   <div class="source-note">${buildMeta(b)}</div>`;
 }
+
+/** Botón para aplicar la página de runas en el cliente de LoL (LCU). */
+function applyRunesBtn(b) {
+  return `<button class="apply-runes" data-cid="${esc(b.championId)}" data-role="${esc(b.role || 'UNKNOWN')}">
+    <span class="ar-ico">⟳</span> Aplicar runas en el cliente
+  </button>`;
+}
+
+/** Envía la página de runas al cliente y da feedback en el propio botón. */
+async function applyRunes(btn) {
+  const championId = Number(btn.dataset.cid);
+  const role = btn.dataset.role || 'UNKNOWN';
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="ar-ico">⟳</span> Aplicando…';
+  btn.className = 'apply-runes loading';
+  let res, data = null;
+  try {
+    res = await fetch('/api/runes/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ championId, role }),
+    });
+    try { data = await res.json(); } catch { /* sin JSON */ }
+  } catch { res = { ok: false, status: 0 }; }
+
+  if (res.ok) {
+    btn.className = 'apply-runes ok';
+    btn.innerHTML = '✓ Runas aplicadas en el cliente';
+  } else {
+    btn.className = 'apply-runes err';
+    const msg = res.status === 503 ? 'Abre el cliente de LoL primero'
+      : res.status === 0 ? 'No se pudo conectar'
+      : (data?.error || `Error ${res.status}`);
+    btn.innerHTML = `✗ ${esc(msg)}`;
+  }
+  setTimeout(() => { btn.disabled = false; btn.className = 'apply-runes'; btn.innerHTML = original; }, 2800);
+}
+
+// Delegación global: cualquier botón .apply-runes aplica sus runas al pulsarlo.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest && e.target.closest('.apply-runes');
+  if (btn && !btn.disabled) applyRunes(btn);
+});
 
 async function refreshChampSelect() {
   $('contextTitle').textContent = 'Champion Select';
