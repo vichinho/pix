@@ -950,6 +950,7 @@ async function refreshMatches() {
   renderStatsFromMatches();
   renderLastGameSummary();
   renderTiltAlert();
+  refreshProgress();
 
   // Tanda completa en segundo plano (el backend cachea, así que sólo trae las
   // partidas nuevas). Al terminar, refresca historial y estadísticas.
@@ -1076,6 +1077,183 @@ function renderSkillMatrix(b) {
     <div class="skill-matrix-wrap"><div class="skill-matrix">${head}${body}</div></div></div>`;
 }
 
+// --- Coach de progreso --------------------------------------------------
+// Todo se calcula del historial ya cargado (matchState.all); no hay peticiones
+// extra ni red. Las metas se guardan en localStorage.
+
+/** Metas por defecto; la de visión sube si sueles ir de support. */
+function defaultGoals() {
+  const supportish = matchState.all.filter((m) => m.role === 'UTILITY').length >= matchState.all.length * 0.4;
+  return { kda: 3, deaths: 5, csmin: 6, vision: supportish ? 25 : 15 };
+}
+function getGoals() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('pix:goals') || '{}');
+    return { ...defaultGoals(), ...raw };
+  } catch { return defaultGoals(); }
+}
+function setGoal(key, value) {
+  const g = getGoals();
+  g[key] = value;
+  try { localStorage.setItem('pix:goals', JSON.stringify(g)); } catch { /* best-effort */ }
+}
+
+const avgOf = (arr, fn) => (arr.length ? arr.reduce((s, x) => s + fn(x), 0) / arr.length : 0);
+
+/** Mini-gráfico de tendencia (SVG) de una serie de valores (antiguo→reciente). */
+function sparkline(values, good) {
+  if (!values || values.length < 2) return '';
+  const w = 56, h = 18, pad = 2;
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const cls = good ? 'spark-good' : 'spark-bad';
+  const last = values[values.length - 1], first = values[0];
+  const trendCls = last >= first ? 'up' : 'down';
+  return `<svg class="spark ${cls} ${trendCls}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+}
+
+/**
+ * Calcula las métricas de progreso: promedio reciente vs anterior, tendencia y
+ * cumplimiento de metas. Devuelve null si no hay datos suficientes.
+ */
+function computeProgress() {
+  const all = matchState.all;
+  if (!all || all.length < 3) return null;
+  const goals = getGoals();
+  const recent = all.slice(0, 10);
+  const older = all.slice(10, 20);
+  const noAram = (arr) => arr.filter((m) => !isAramQueue(m.queueId));
+
+  const metric = (fn, arrRecent, arrOlder, target, higherBetter) => {
+    const cur = avgOf(arrRecent, fn);
+    const prev = arrOlder.length ? avgOf(arrOlder, fn) : cur;
+    const series = arrRecent.slice(0, 12).map(fn).reverse();
+    const met = higherBetter ? cur >= target : cur <= target;
+    // progreso 0..1 respecto a la meta (para la barra)
+    const prog = higherBetter
+      ? Math.max(0, Math.min(1, cur / target))
+      : Math.max(0, Math.min(1, target / Math.max(0.1, cur)));
+    return { cur, prev, series, target, met, prog, higherBetter };
+  };
+
+  const csR = noAram(recent), csO = noAram(older);
+  return {
+    count: all.length,
+    kda: metric(kdaOf, recent, older, goals.kda, true),
+    deaths: metric((m) => m.deaths, recent, older, goals.deaths, false),
+    csmin: metric(csmOf, csR, csO, goals.csmin, true),
+    vision: metric((m) => m.visionScore || 0, recent, older, goals.vision, true),
+  };
+}
+
+const GOAL_META = {
+  kda:    { key: 'kda',    label: 'KDA',        step: '0.5', fmt: (v) => v.toFixed(2) },
+  deaths: { key: 'deaths', label: 'Muertes',    step: '1',   fmt: (v) => v.toFixed(1) },
+  csmin:  { key: 'csmin',  label: 'CS/min',     step: '0.5', fmt: (v) => v.toFixed(1) },
+  vision: { key: 'vision', label: 'Visión',     step: '1',   fmt: (v) => Math.round(v) },
+};
+
+/** Elige el "foco" de mejora: la meta más lejos de cumplirse. */
+function focusInsight(p) {
+  const cards = ['kda', 'deaths', 'csmin', 'vision'].map((k) => ({ k, ...p[k] }));
+  const pending = cards.filter((c) => !c.met);
+  const pick = (pending.length ? pending : cards).sort((a, b) => a.prog - b.prog)[0];
+  const tips = {
+    kda: 'Elige mejor tus peleas: entra cuando tengas ventaja numérica o de objetos.',
+    deaths: 'Baja tus muertes: respeta el rango enemigo y no fuerces jugadas sin visión.',
+    csmin: 'Sube tu farmeo: no descuides súbditos entre jugadas, el oro constante suma.',
+    vision: 'Sube tu visión: coloca y limpia guardianes alrededor de los objetivos.',
+  };
+  return { key: pick.k, tip: tips[pick.k] };
+}
+
+/** Racha actual (V/D consecutivas desde la más reciente). */
+function currentStreak() {
+  const all = matchState.all;
+  if (!all.length) return { n: 0, win: false };
+  const win = all[0].win;
+  let n = 0;
+  for (const m of all) { if (m.win === win) n++; else break; }
+  return { n, win };
+}
+
+/** Panel del coach de progreso; se inyecta arriba del explorador cuando estás inactivo. */
+function renderProgressInto(el) {
+  if (!el) return;
+  const p = computeProgress();
+  if (!p) {
+    el.innerHTML = riotConfigured
+      ? `<div class="pg-empty muted">${T('Juega algunas partidas para ver tu progreso aquí.')}</div>`
+      : '';
+    return;
+  }
+
+  // Forma reciente (últimas 10, izquierda = más reciente).
+  const form = matchState.all.slice(0, 10)
+    .map((m) => `<span class="form-pip ${m.win ? 'w' : 'l'}" data-tip="${esc((m.championName || champName(m.championId)) + ' · ' + (m.win ? T('Victoria') : T('Derrota')))}"></span>`)
+    .join('');
+  const st = currentStreak();
+  const streakTxt = st.n >= 2
+    ? T('{n} {res} seguidas', { n: st.n, res: st.win ? T('victorias') : T('derrotas') })
+    : '';
+
+  // Tarjetas de metas.
+  const goalCard = (k) => {
+    const m = p[k], meta = GOAL_META[k];
+    const arrow = m.cur === m.prev ? '' : (m.cur > m.prev
+      ? `<span class="pg-delta ${meta.key === 'deaths' ? 'bad' : 'good'}">▲</span>`
+      : `<span class="pg-delta ${meta.key === 'deaths' ? 'good' : 'bad'}">▼</span>`);
+    return `<div class="pg-goal ${m.met ? 'met' : ''}">
+      <div class="pg-goal-head">
+        <span class="pg-goal-label">${T(meta.label)}</span>
+        ${m.met ? '<span class="pg-badge">✓</span>' : ''}
+      </div>
+      <div class="pg-goal-val">${meta.fmt(m.cur)} ${arrow} ${sparkline(m.series, meta.key !== 'deaths')}</div>
+      <div class="pg-bar"><div class="pg-bar-fill ${m.met ? 'ok' : ''}" style="width:${Math.round(m.prog * 100)}%"></div></div>
+      <label class="pg-goal-target">${T('Meta')} <input type="number" class="pg-target" data-goal="${meta.key}" value="${m.target}" step="${meta.step}" min="0" inputmode="decimal"/></label>
+    </div>`;
+  };
+
+  const focus = focusInsight(p);
+
+  el.innerHTML = `
+    <div class="pg-head">
+      <span class="pg-title">${T('Tu progreso')}</span>
+      <span class="pg-sub muted">${T('últimas {n} partidas', { n: Math.min(10, p.count) })}</span>
+    </div>
+    <div class="pg-form">
+      <div class="form-pips">${form}</div>
+      ${streakTxt ? `<span class="pg-streak ${st.win ? 'w' : 'l'}">${streakTxt}</span>` : ''}
+    </div>
+    <div class="pg-goals">
+      ${['kda', 'deaths', 'csmin', 'vision'].map(goalCard).join('')}
+    </div>
+    <div class="pg-focus">
+      <span class="pg-focus-ico">🎯</span>
+      <div><span class="pg-focus-label">${T('Foco de la semana')}: ${T(GOAL_META[focus.key].label)}</span>
+      <span class="pg-focus-tip">${T(focus.tip)}</span></div>
+    </div>`;
+
+  el.querySelectorAll('.pg-target').forEach((inp) => {
+    inp.addEventListener('change', () => {
+      const v = parseFloat(inp.value);
+      if (Number.isFinite(v) && v >= 0) { setGoal(inp.dataset.goal, v); refreshProgress(); }
+    });
+    inp.addEventListener('click', (e) => e.stopPropagation());
+  });
+}
+
+/** Refresca el panel de progreso si está visible (tras cargar partidas o cambiar metas). */
+function refreshProgress() {
+  const el = document.getElementById('progressPanel');
+  if (el) renderProgressInto(el);
+}
+
 // --- Contexto -----------------------------------------------------------
 async function refreshContext(clientState) {
   // La Live Client API (puerto 2999) es independiente del LCU: funciona incluso
@@ -1132,11 +1310,15 @@ function renderIdleContext() {
       </div>`
     : '';
   $('contextBody').innerHTML = `
+    <div id="progressPanel" class="progress-panel"></div>
+    <div class="idle-section-head">${T('Explorar builds')}</div>
     <div class="muted" style="margin-bottom:.6rem">${T('No estás en partida. Busca cualquier campeón para ver su build, runas y orden de subida:')}</div>
     ${quick}
     <input id="champSearch" class="champ-search" type="text" placeholder="${esc(T('Buscar campeón…'))}" autocomplete="off" spellcheck="false"/>
     <div id="champGrid" class="champ-grid">${tiles}</div>
     <div id="champBuildView" class="champ-build-view"></div>`;
+
+  renderProgressInto($('progressPanel'));
 
   const search = $('champSearch');
   const grid = $('champGrid');

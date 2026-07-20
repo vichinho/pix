@@ -145,6 +145,26 @@
       'You\'re on <b>{n} losses in a row</b>. Watch out for tilt — a short break now often avoids the 4th and 5th loss. Breathe before the next one. 💧',
     'Entendido, ocultar': 'Got it, hide',
 
+    // — Coach de progreso —
+    'Tu progreso': 'Your progress',
+    'últimas {n} partidas': 'last {n} games',
+    'Juega algunas partidas para ver tu progreso aquí.': 'Play a few games to see your progress here.',
+    'Muertes': 'Deaths',
+    'CS/min': 'CS/min',
+    'Meta': 'Goal',
+    'Foco de la semana': 'Focus of the week',
+    '{n} {res} seguidas': '{n} {res} in a row',
+    'victorias': 'wins',
+    'derrotas': 'losses',
+    'Elige mejor tus peleas: entra cuando tengas ventaja numérica o de objetos.':
+      'Pick your fights better: engage when you have a numbers or item advantage.',
+    'Baja tus muertes: respeta el rango enemigo y no fuerces jugadas sin visión.':
+      'Cut your deaths: respect enemy range and don\'t force plays without vision.',
+    'Sube tu farmeo: no descuides súbditos entre jugadas, el oro constante suma.':
+      'Raise your farm: don\'t neglect minions between plays, steady gold adds up.',
+    'Sube tu visión: coloca y limpia guardianes alrededor de los objetivos.':
+      'Raise your vision: place and clear wards around objectives.',
+
     // — Maestría —
     '{name} · Maestría {lvl} · {pts} pts': '{name} · Mastery {lvl} · {pts} pts',
     'Tus campeones (maestría)': 'Your champions (mastery)',
