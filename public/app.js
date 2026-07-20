@@ -1199,6 +1199,34 @@ function championRecords(minGames = 3) {
   return { best, worst };
 }
 
+/** Récord por campeón enemigo enfrentado (de m.enemies del historial). */
+function enemyRecords() {
+  const by = new Map();
+  for (const m of matchState.all) {
+    for (const eid of (m.enemies || [])) {
+      let e = by.get(eid);
+      if (!e) { e = { championId: eid, games: 0, wins: 0 }; by.set(eid, e); }
+      e.games += 1; if (m.win) e.wins += 1;
+    }
+  }
+  return by;
+}
+
+/** Tu récord cuando enfrentas a un campeón concreto, o null. */
+function recordVs(championId) {
+  const e = enemyRecords().get(Number(championId));
+  return e && e.games ? { ...e, wr: e.wins / e.games } : null;
+}
+
+/** Campeones que más te cuestan: peor winrate entre enemigos frecuentes. */
+function banSuggestions(n = 3, minGames = 3) {
+  return [...enemyRecords().values()]
+    .filter((e) => e.games >= minGames)
+    .map((e) => ({ ...e, wr: e.wins / e.games }))
+    .sort((a, b) => a.wr - b.wr || b.games - a.games)
+    .slice(0, n);
+}
+
 /** Franjas horarias (hora local del jugador). */
 const TIME_SLOTS = [
   { key: 'Madrugada', from: 0, to: 6 },
@@ -1305,6 +1333,8 @@ function renderProgressInto(el) {
   if (rec.best) chips.push(insightChip('🏅', T('Mejor campeón'), champIconMini(rec.best.championId) + esc(rec.best.name), Math.round(rec.best.wr * 100), 'good'));
   if (rec.worst) chips.push(insightChip('⚠️', T('Ojo con'), champIconMini(rec.worst.championId) + esc(rec.worst.name), Math.round(rec.worst.wr * 100), 'bad'));
   if (slot) chips.push(insightChip('⏰', T('Mejor horario'), T(slot.key), Math.round(slot.wr * 100), 'good'));
+  const worstMu = banSuggestions(1)[0];
+  if (worstMu) chips.push(insightChip('🧨', T('Peor matchup'), champIconMini(worstMu.championId) + esc(champName(worstMu.championId)), Math.round(worstMu.wr * 100), 'bad'));
   if (today) chips.push(insightChip('📅', T('Hoy'), `${today.w}–${today.l}`, null, ''));
   const insightsHtml = chips.length ? `<div class="pg-insights">${chips.join('')}</div>` : '';
 
@@ -1586,6 +1616,20 @@ document.addEventListener('mouseover', (e) => {
 document.addEventListener('mousemove', (e) => { if (tipTarget) positionTip(e.clientX, e.clientY); });
 window.addEventListener('scroll', hideTip, true);
 
+/** Bloque de bans sugeridos según tu historial (los que más te cuestan). */
+function renderBanSuggestions() {
+  const bans = banSuggestions(3);
+  if (!bans.length) return '';
+  const items = bans.map((b) => {
+    const wr = Math.round(b.wr * 100);
+    const tip = `${champName(b.championId)} · ${T('{n} partidas', { n: b.games })} · ${wr}% WR`;
+    return `<div class="ban-sugg" data-tip="${esc(tip)}">${champChip(b.championId, 22)}<span class="ban-wr loss">${wr}%</span></div>`;
+  }).join('');
+  return `<div class="block"><div class="label">${T('Bans sugeridos para ti')}</div>
+    <div class="ban-list">${items}</div>
+    <div class="ban-note muted">${T('Campeones contra los que más pierdes últimamente.')}</div></div>`;
+}
+
 async function refreshChampSelect() {
   $('contextTitle').textContent = 'Champion Select';
   const { data } = await api('/api/champ-select/session');
@@ -1612,6 +1656,7 @@ async function refreshChampSelect() {
       <span class="k">${T('Bans')}</span><span class="iconrow">${(s.bans || []).map((b) => champChip(b, 18)).join(' ') || '—'}</span>
     </div>
     ${pickHtml}
+    ${renderBanSuggestions()}
     <div class="block"><div class="label">${T('Sugerencias para tu rol')}</div>${recHtml}</div>`;
 }
 

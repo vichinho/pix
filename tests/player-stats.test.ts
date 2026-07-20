@@ -26,6 +26,7 @@ function match(over: Partial<MatchSummary>): MatchSummary {
     gold: 10000,
     damage: 15000,
     visionScore: 20,
+    enemies: [],
     playedAt: '2026-07-13T00:00:00.000Z',
     ...over,
   };
