@@ -4,6 +4,7 @@
   "private": true,
   "description": "PIX: companion app personal para League of Legends. Detecta el estado del cliente, muestra perfil e historial y asiste durante champion select. No afiliado ni patrocinado por Riot Games.",
   "author": "vichinho",
+  "repository": "https://github.com/vichinho/pix",
   "type": "module",
   "main": "electron/main.mjs",
   "engines": {
@@ -51,7 +52,10 @@
     "linux": {
       "target": "AppImage",
       "category": "Game"
-    }
+    },
+    "publish": [
+      { "provider": "github", "owner": "vichinho", "repo": "pix" }
+    ]
   },
   "dependencies": {
     "express": "^4.19.2",

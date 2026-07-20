@@ -1,0 +1,46 @@
+name: Construir y publicar instaladores
+
+# Compila PIX en runners de GitHub (Windows/macOS/Linux) y publica los
+# instaladores como GitHub Release. Se dispara al empujar un tag "vX.Y.Z"
+# (o manualmente). No requiere compilar en tu equipo.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: '--win'
+          - os: macos-latest
+            args: '--mac'
+          - os: ubuntu-latest
+            args: '--linux'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Compilar backend (tsc)
+        run: npm run build
+
+      - name: Construir y publicar instalador
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
