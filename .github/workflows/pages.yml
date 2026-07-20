@@ -1,4 +1,5 @@
 name: Deploy landing page to GitHub Pages
+# Pages source: GitHub Actions.
 
 # Publica la carpeta site/ (la landing de PIX) en GitHub Pages.
 # Requiere: Settings → Pages → Source = "GitHub Actions".
