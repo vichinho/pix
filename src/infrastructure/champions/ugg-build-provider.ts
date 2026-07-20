@@ -1,202 +1,209 @@
+/**
+ * MerakiBuildProvider
+ * -------------------
+ * Usa la CDN pública de Meraki Analytics para obtener builds reales por campeón.
+ * No requiere API key, no tiene Cloudflare, y se actualiza con cada patch.
+ *
+ * CDN: https://cdn.merakianalytics.com/riot/lol/resources/latest/en-US/champions/{key}.json
+ *
+ * Nota: Meraki provee datos de campeón (stats, habilidades, items recomendados
+ * por Riot), NO builds de winrate como U.GG. Por eso el provider arma una build
+ * razonable usando los ítems recomendados por Riot + runas estándar por rol,
+ * funcionando como puente entre los datos curados locales y la realidad del parche.
+ */
 import type { BuildProvider } from '../../domain/build.js';
 import type { ChampionBuild, Role } from '../../domain/types.js';
 
-/** Mapa de roles de PIX → ID de rol que usa U.GG en su API. */
-const ROLE_MAP: Record<Role, number> = {
-  TOP: 4, JUNGLE: 1, MIDDLE: 5, BOTTOM: 3, UTILITY: 2, ARAM: 12, UNKNOWN: 5,
+// ── Runas estándar por rol ─────────────────────────────────────────────────────
+// IDs de Data Dragon / Riot para keystones y estilos comunes por posición.
+// Son una buena aproximación para campeones que no tienen build curada en seed.
+const RUNES_BY_ROLE: Record<Role, ChampionBuild['runes']> = {
+  TOP: {
+    primaryStyleId: 8000, keystoneId: 8010,  // Precision / Conqueror
+    primary: [9101, 9104, 8299], secondaryStyleId: 8200,
+    secondary: [8210, 8237], shards: [5005, 5008, 5011],
+  },
+  JUNGLE: {
+    primaryStyleId: 8000, keystoneId: 8010,
+    primary: [9101, 9104, 8299], secondaryStyleId: 8400,
+    secondary: [8444, 8453], shards: [5005, 5008, 5011],
+  },
+  MIDDLE: {
+    primaryStyleId: 8100, keystoneId: 8112, // Domination / Electrocute
+    primary: [8143, 8136, 8106], secondaryStyleId: 8200,
+    secondary: [8210, 8237], shards: [5007, 5008, 5011],
+  },
+  BOTTOM: {
+    primaryStyleId: 8000, keystoneId: 8005, // Precision / Press the Attack
+    primary: [9101, 9104, 8299], secondaryStyleId: 8100,
+    secondary: [8143, 8135], shards: [5005, 5008, 5011],
+  },
+  UTILITY: {
+    primaryStyleId: 8200, keystoneId: 8229, // Sorcery / Summon Aery
+    primary: [8226, 8210, 8232], secondaryStyleId: 8300,
+    secondary: [8304, 8347], shards: [5007, 5008, 5011],
+  },
+  ARAM: {
+    primaryStyleId: 8200, keystoneId: 8229,
+    primary: [8226, 5008, 8232], secondaryStyleId: 8300,
+    secondary: [8304, 8347], shards: [5007, 5008, 5011],
+  },
+  UNKNOWN: {
+    primaryStyleId: 8200, keystoneId: 8214, // Sorcery / Summon Aery
+    primary: [8226, 8210, 8232], secondaryStyleId: 8300,
+    secondary: [8304, 8347], shards: [5007, 5008, 5011],
+  },
 };
 
-/** IDs de hechizos de invocador de Riot → nombres que espera ChampionBuild.summonerSpells. */
-const SUMMONER_SPELL_NAMES: Record<number, string> = {
-  1: 'Cleanse',
-  3: 'Exhaust',
-  4: 'Flash',
-  6: 'Ghost',
-  7: 'Heal',
-  11: 'Smite',
-  12: 'Teleport',
-  13: 'Clarity',
-  14: 'Ignite',
-  21: 'Barrier',
-  32: 'Mark',   // Snowball (ARAM)
-  39: 'Mark',
+const SUMMONERS_BY_ROLE: Record<Role, string[]> = {
+  TOP:     ['Flash', 'Teleport'],
+  JUNGLE:  ['Flash', 'Smite'],
+  MIDDLE:  ['Flash', 'Ignite'],
+  BOTTOM:  ['Flash', 'Heal'],
+  UTILITY: ['Flash', 'Ignite'],
+  ARAM:    ['Flash', 'Mark'],
+  UNKNOWN: ['Flash', 'Ignite'],
 };
 
-/** IDs de habilidad que usa U.GG (1=Q, 2=W, 3=E, 4=R) → nombre legible. */
-const SKILL_NAMES: Record<number, string> = { 1: 'Q', 2: 'W', 3: 'E', 4: 'R' };
-
-/**
- * Estructura real de la respuesta de U.GG.
- * Cada campo es un array de arrays donde [0] contiene los IDs
- * y los siguientes sub-arrays son estadísticas (wins, games).
- */
-interface UggRawData {
-  /** [[primaryStyle, keystone, p1, p2, p3], [secStyle, s1, s2], [shard1, shard2, shard3]] */
-  runes?: number[][];
-  /** [[spellId1, spellId2], [wins, games]] */
-  summoner_spells?: number[][];
-  /** [[item1, item2, ...], [wins, games]] */
-  starting_items?: number[][];
-  /** [[item1, item2, item3], [wins, games]] */
-  core_items?: number[][];
-  /** [[itemId, wins, games], ...] — ítems situacionales ordenados por pick rate */
-  fourth_items?: number[][];
-  /** [[skillNum, skillNum, ...], [wins, games]] */
-  skill_order?: number[][];
-  win_rate?: number;
-  pick_rate?: number;
+// ── Tipos de la respuesta de Meraki ─────────────────────────────────────────
+interface MerakiItem {
+  id: number;
+  name: string;
 }
 
-/** Filtra undefined de un array y garantiza number[] para TypeScript strict + noUncheckedIndexedAccess. */
-function filterNumbers(arr: (number | undefined)[]): number[] {
-  return arr.filter((n): n is number => n !== undefined);
+interface MerakiItemSet {
+  items: MerakiItem[];
 }
 
-/**
- * Obtiene el patch actual desde Data Dragon en formato U.GG (ej: "25_14").
- * noUncheckedIndexedAccess-safe: valida versions[0] antes de usarlo.
- */
-async function fetchCurrentPatch(): Promise<string> {
-  const res = await fetch('https://ddragon.leagueoflegends.com/api/versions.json', {
-    signal: AbortSignal.timeout(4000),
+interface MerakiChampion {
+  name: string;
+  key: string;             // nombre de Data Dragon (ej: "Ahri", "MissFortune")
+  apiName: string;        // igual que key pero en formato Riot
+  // Riot sugiere sets de ítems opcionales por estilo de juego
+  recommendedItemSets?: MerakiItemSet[];
+  // Stats y habilidades (no usamos aquí, pero están disponibles)
+  [key: string]: unknown;
+}
+
+// Mapa de championId Riot → key de Meraki (nombre en Data Dragon).
+// Meraki usa el mismo key que Data Dragon (MissFortune, Wukong como MonkeyKing, etc.)
+// Solo necesitamos el endpoint por nombre, pero lo resolvemos dinámicamente.
+const MERAKI_BASE = 'https://cdn.merakianalytics.com/riot/lol/resources/latest/en-US';
+
+async function fetchMerakiIndex(): Promise<Record<string, { id: number; key: string }>> {
+  const res = await fetch(`${MERAKI_BASE}/champions.json`, {
+    signal: AbortSignal.timeout(6000),
+    headers: { Accept: 'application/json' },
   });
-  const versions = await res.json() as string[];
-  const latest = versions[0];
-  if (latest === undefined) throw new Error('DDragon: lista de versiones vacía');
-  const parts = latest.split('.');
-  const major = parts[0] ?? String(new Date().getFullYear());
-  const minor = parts[1] ?? '1';
-  return `${major}_${minor}`;
+  if (!res.ok) throw new Error(`Meraki index HTTP ${res.status}`);
+  return res.json() as Promise<Record<string, { id: number; key: string }>>;
+}
+
+async function fetchMerakiChampion(key: string): Promise<MerakiChampion> {
+  const res = await fetch(`${MERAKI_BASE}/champions/${key}.json`, {
+    signal: AbortSignal.timeout(6000),
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Meraki champion HTTP ${res.status}`);
+  return res.json() as Promise<MerakiChampion>;
 }
 
 /**
- * Proveedor de builds por campeón basado en la API pública de U.GG.
- * Devuelve builds específicas por championId y rol (no genéricas por arquetipo).
+ * Proveedor de builds usando Meraki Analytics CDN (pública, sin Cloudflare).
  *
  * - No requiere API key.
- * - Cachea los resultados en memoria por sesión.
- * - Si falla la red, devuelve null y la cadena FallbackBuildProvider
- *   cae al siguiente proveedor (SeedBuildProvider, etc.).
- *
- * Integración en server.ts:
- * @example
- * new FallbackBuildProvider([
- *   new UggBuildProvider(),        // ← primero: datos reales por campeón
- *   new SeedBuildProvider(),       // ← fallback rápido sin red
- *   new ClassifiedBuildProvider(championCatalog),
- *   ...
- * ])
+ * - Cachea índice y campeones en memoria por sesión.
+ * - Devuelve null si falla la red (la cadena FallbackBuildProvider sigue al siguiente).
+ * - Los ítems vienen de los sets recomendados oficiales de Riot en Meraki;
+ *   las runas y summoners son los estándar por rol (no hay datos de winrate en Meraki).
  */
-export class UggBuildProvider implements BuildProvider {
-  readonly name = 'ugg';
+export class MerakiBuildProvider implements BuildProvider {
+  readonly name = 'meraki';
 
-  private readonly cache = new Map<string, ChampionBuild | null>();
-  private patchPromise: Promise<string> | null = null;
+  // Cache: championId → Meraki key (string como "Ahri", "MissFortune")
+  private readonly idToKey = new Map<number, string>();
+  // Cache: key → datos completos del campeón
+  private readonly champCache = new Map<string, MerakiChampion>();
+  // Cache de build final
+  private readonly buildCache = new Map<string, ChampionBuild | null>();
+  // Promesa del índice (se carga una sola vez)
+  private indexPromise: Promise<void> | null = null;
 
-  private getPatch(): Promise<string> {
-    if (this.patchPromise === null) {
-      this.patchPromise = fetchCurrentPatch().catch(() => {
-        const year = new Date().getFullYear();
-        return `${year}_1`;
-      });
+  private loadIndex(): Promise<void> {
+    if (this.indexPromise === null) {
+      this.indexPromise = fetchMerakiIndex()
+        .then((index) => {
+          for (const [key, data] of Object.entries(index)) {
+            this.idToKey.set(data.id, key);
+          }
+        })
+        .catch(() => {
+          // Si falla el índice, el provider devuelve null para todos los campeones
+        });
     }
-    return this.patchPromise;
+    return this.indexPromise;
   }
 
   async getBuild(championId: number, role: Role): Promise<ChampionBuild | null> {
     const cacheKey = `${championId}:${role}`;
-    if (this.cache.has(cacheKey)) return this.cache.get(cacheKey) ?? null;
+    if (this.buildCache.has(cacheKey)) return this.buildCache.get(cacheKey) ?? null;
 
     try {
-      const patch = await this.getPatch();
-      const uggRole = ROLE_MAP[role];
+      // 1. Asegurar que el índice esté cargado
+      await this.loadIndex();
 
-      const url =
-        `https://stats2.u.gg/lol/1.5/table/items/${patch}/ranked_solo_5x5` +
-        `/${championId}/${uggRole}/1/1.5.0.json`;
-
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(5000),
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!res.ok) {
-        this.cache.set(cacheKey, null);
+      // 2. Resolver championId → Meraki key
+      const key = this.idToKey.get(championId);
+      if (key === undefined) {
+        this.buildCache.set(cacheKey, null);
         return null;
       }
 
-      const raw = await res.json() as UggRawData;
-      const build = this.mapToChampionBuild(championId, role, raw, patch);
-      this.cache.set(cacheKey, build);
+      // 3. Obtener datos del campeón (con caché)
+      let champ = this.champCache.get(key);
+      if (champ === undefined) {
+        champ = await fetchMerakiChampion(key);
+        this.champCache.set(key, champ);
+      }
+
+      // 4. Armar la build
+      const build = this.mapToChampionBuild(championId, champ, role);
+      this.buildCache.set(cacheKey, build);
       return build;
 
     } catch {
-      this.cache.set(cacheKey, null);
+      this.buildCache.set(cacheKey, null);
       return null;
     }
   }
 
   private mapToChampionBuild(
     championId: number,
+    champ: MerakiChampion,
     role: Role,
-    data: UggRawData,
-    patch: string,
   ): ChampionBuild {
-    // ── Runas ────────────────────────────────────────────────────────────────
-    const runeGroups     = data.runes ?? [];
-    const primaryGroup   = runeGroups[0] ?? [];
-    const secondaryGroup = runeGroups[1] ?? [];
-    const shardGroup     = runeGroups[2] ?? [];
+    // Items recomendados por Riot en Meraki (primer set disponible)
+    const itemSet = champ.recommendedItemSets?.[0];
+    const allItems = itemSet?.items ?? [];
 
-    const primaryStyleId   = primaryGroup[0]   ?? 0;
-    const keystoneId       = primaryGroup[1]   ?? 0;
-    const secondaryStyleId = secondaryGroup[0] ?? 0;
-
-    // ── Hechizos ─────────────────────────────────────────────────────────────
-    // summoner_spells[0] = [spellId1, spellId2]
-    const spellIds = data.summoner_spells?.[0] ?? [];
-    const summonerSpells = spellIds.map(
-      (id) => SUMMONER_SPELL_NAMES[id] ?? `Spell_${id}`,
-    );
-
-    // ── Ítems ─────────────────────────────────────────────────────────────────
-    const startingItems = filterNumbers(data.starting_items?.[0] ?? []);
-    const coreItems     = filterNumbers(data.core_items?.[0] ?? []);
-
-    // fourth_items = [[itemId, wins, games], ...] → tomamos solo el itemId de cada tuple
-    const situationalItems = (data.fourth_items ?? []).map(
-      (tuple) => tuple[0] ?? 0,
-    ).filter((id) => id !== 0);
-
-    // ── Orden de habilidades ─────────────────────────────────────────────────
-    // skill_order[0] = [1,1,2,1,3,1,4,...] donde 1=Q, 2=W, 3=E, 4=R
-    const rawSkills = data.skill_order?.[0] ?? [];
-    const skillOrder: string[] = rawSkills.reduce<string[]>((acc, n) => {
-      const name = SKILL_NAMES[n];
-      if (name !== undefined) acc.push(name);
-      return acc;
-    }, []);
+    // Dividimos: primeros 2 = starting, siguientes 3 = core, resto = situational
+    const startingItems = allItems.slice(0, 2).map((i) => i.id);
+    const coreItems     = allItems.slice(2, 5).map((i) => i.id);
+    const situationalItems = allItems.slice(5).map((i) => i.id);
 
     return {
       championId,
-      championName: '',   // enrich-build.ts lo rellena con el catálogo
+      championName: champ.name,
       role,
-      source: 'ugg',
-      patch: patch.replace('_', '.'),
-      summonerSpells,
-      runes: {
-        primaryStyleId,
-        keystoneId,
-        primary:         filterNumbers([primaryGroup[2], primaryGroup[3], primaryGroup[4]]),
-        secondaryStyleId,
-        secondary:       filterNumbers([secondaryGroup[1], secondaryGroup[2]]),
-        shards:          filterNumbers([shardGroup[0], shardGroup[1], shardGroup[2]]),
-      },
+      source: 'meraki',
+      patch: 'latest',
+      summonerSpells: SUMMONERS_BY_ROLE[role],
+      runes: RUNES_BY_ROLE[role],
       startingItems,
       coreItems,
       situationalItems,
-      skillOrder,
-      notes: `Build de U.GG — patch ${patch.replace('_', '.')}`,
+      skillOrder: ['Q', 'W', 'E'],
+      notes: `Build base de Meraki Analytics (ítems recomendados por Riot para ${champ.name}).`,
     };
   }
 }
