@@ -1,5 +1,5 @@
-<title>PIX — Your fairy companion on the Rift</title>
-<meta name="description" content="PIX is a free desktop companion for League of Legends: profile, rank, match history, champion‑select builds, live coaching and more. Runs locally with your own Riot API key." />
+<title>PIX — Tu hada compañera en la Grieta</title>
+<meta name="description" content="PIX es una app de escritorio gratuita para League of Legends: perfil, rango, historial, builds en selección de campeón, coach en vivo y más. Corre en tu equipo con tu propia clave de la Riot API." />
 <style>
   :root {
     --night:   #0f0824;
@@ -31,7 +31,6 @@
   }
   a { color: inherit; }
 
-  /* Ambient cosmos: gradient wash + drifting dust canvas */
   .bg {
     position: fixed;
     inset: 0;
@@ -46,19 +45,26 @@
 
   .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
 
-  /* ── Nav ── */
   .nav {
     display: flex; align-items: center; justify-content: space-between;
     padding: 1.4rem 0; gap: 1rem;
   }
   .brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.04em; }
   .brand .mark { width: 30px; height: 30px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
-  .nav-links { display: flex; align-items: center; gap: 1.4rem; font-size: 0.9rem; color: var(--muted); }
+  .nav-right { display: flex; align-items: center; gap: 1.3rem; }
+  .nav-links { display: flex; align-items: center; gap: 1.3rem; font-size: 0.9rem; color: var(--muted); }
   .nav-links a { text-decoration: none; transition: color .2s; }
   .nav-links a:hover { color: var(--text); }
-  .nav-ghost { display: none; }
 
-  /* ── Buttons ── */
+  .site-lang { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .site-lang button {
+    background: none; border: none; color: var(--muted); font-family: inherit;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; padding: 0.3rem 0.55rem; cursor: pointer;
+    transition: background .2s, color .2s;
+  }
+  .site-lang button:hover { color: var(--text); }
+  .site-lang button.on { background: linear-gradient(100deg, var(--cyan), var(--pink)); color: #1a0f2e; }
+
   .btn {
     display: inline-flex; align-items: center; gap: 0.55rem;
     padding: 0.8rem 1.35rem; border-radius: 11px; font-weight: 600; font-size: 0.95rem;
@@ -74,7 +80,6 @@
   .btn-ghost { color: var(--text); border-color: var(--border-2); background: var(--panel); }
   .btn-ghost:hover { border-color: var(--cyan); transform: translateY(-2px); }
 
-  /* ── Hero ── */
   .hero { text-align: center; padding: 2.5rem 0 3.5rem; }
   .fairy-stage { position: relative; width: 210px; height: 210px; margin: 0 auto 0.5rem; }
   .fairy-glow {
@@ -104,14 +109,12 @@
   .platforms { margin-top: 1.1rem; font-size: 0.82rem; color: var(--faint); letter-spacing: 0.02em; }
   .platforms b { color: var(--muted); font-weight: 600; }
 
-  /* ── Section scaffolding ── */
   section { padding: 3.2rem 0; }
   .sec-head { max-width: 40rem; margin: 0 auto 2.2rem; text-align: center; }
   .sec-head .eyebrow { color: var(--cyan); }
   .sec-head h2 { margin: 0.2rem 0 0.5rem; font-size: clamp(1.7rem, 3.6vw, 2.35rem); font-weight: 750; letter-spacing: -0.01em; text-wrap: balance; }
   .sec-head p { margin: 0; color: var(--muted); }
 
-  /* ── Feature grid ── */
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
@@ -127,7 +130,6 @@
   .card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.005em; }
   .card p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.6; }
 
-  /* ── Steps ── */
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
   .step { position: relative; padding: 1.6rem 1.3rem 1.4rem; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); }
   .step .n {
@@ -138,7 +140,6 @@
   .step p { margin: 0; color: var(--muted); font-size: 0.92rem; }
   .step p a { color: var(--cyan); }
 
-  /* ── Privacy strip ── */
   .privacy {
     display: flex; gap: 1.1rem; align-items: flex-start;
     max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.6rem;
@@ -149,7 +150,6 @@
   .privacy h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
   .privacy p { margin: 0; color: var(--muted); font-size: 0.94rem; }
 
-  /* ── Footer ── */
   footer { border-top: 1px solid var(--border); margin-top: 1.5rem; padding: 2.2rem 0 2.8rem; }
   .foot-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
   .foot-links { display: flex; gap: 1.3rem; font-size: 0.9rem; color: var(--muted); }
@@ -179,7 +179,6 @@
 <div class="wrap">
   <nav class="nav">
     <span class="brand">
-      <!-- app icon mark -->
       <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
         <defs>
           <linearGradient id="mBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1A1033"/><stop offset="1" stop-color="#2E1856"/></linearGradient>
@@ -194,18 +193,23 @@
       </svg>
       PIX
     </span>
-    <span class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#how">How it works</a>
-      <a href="https://github.com/vichinho/pix" target="_blank" rel="noopener">GitHub</a>
+    <span class="nav-right">
+      <span class="nav-links">
+        <a href="#features" data-t="nav.features">Funciones</a>
+        <a href="#how" data-t="nav.how">Cómo funciona</a>
+        <a href="https://github.com/vichinho/pix" target="_blank" rel="noopener">GitHub</a>
+      </span>
+      <span class="site-lang" role="group" aria-label="Idioma / Language">
+        <button type="button" data-lang="es">ES</button>
+        <button type="button" data-lang="en">EN</button>
+      </span>
     </span>
   </nav>
 
   <header class="hero">
     <div class="fairy-stage">
       <div class="fairy-glow"></div>
-      <!-- floating fairy (no card) -->
-      <svg class="fairy" viewBox="80 90 352 300" aria-label="PIX fairy">
+      <svg class="fairy" viewBox="80 90 352 300" aria-label="PIX">
         <defs>
           <linearGradient id="hBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FF0E8"/><stop offset="1" stop-color="#F6A6D6"/></linearGradient>
         </defs>
@@ -221,98 +225,50 @@
       </svg>
     </div>
 
-    <span class="eyebrow">League of Legends companion</span>
+    <span class="eyebrow" data-t="hero.eyebrow">Compañera para League of Legends</span>
     <h1 class="wordmark">PIX</h1>
-    <p class="tagline">Your fairy companion on the Rift</p>
-    <p class="lede">
-      A free desktop app that reads your League client and turns each session into a head start —
-      your rank and stats, champion‑select builds and runes, a live objective coach, and honest
-      post‑game feedback. All on your machine, with your own Riot API key.
+    <p class="tagline" data-t="hero.tagline">Tu hada compañera en la Grieta</p>
+    <p class="lede" data-t="hero.lede">
+      Una app de escritorio gratuita que lee tu cliente de League y convierte cada sesión en una ventaja:
+      tu rango y estadísticas, builds y runas en selección de campeón, un coach de objetivos en vivo y
+      feedback honesto tras la partida. Todo en tu equipo, con tu propia clave de la Riot API.
     </p>
     <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/vichinho/pix/releases/latest" target="_blank" rel="noopener">↓ Download for Windows</a>
-      <a class="btn btn-ghost" href="https://github.com/vichinho/pix" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn btn-primary" href="https://github.com/vichinho/pix/releases/latest" target="_blank" rel="noopener" data-t="hero.download">↓ Descargar para Windows</a>
+      <a class="btn btn-ghost" href="https://github.com/vichinho/pix" target="_blank" rel="noopener" data-t="hero.github">Ver en GitHub</a>
     </div>
-    <p class="platforms">Free · <b>Windows</b> · macOS · Linux · Español &amp; English</p>
+    <p class="platforms" data-t="hero.platforms">Gratis · <b>Windows</b> · macOS · Linux · Español e inglés</p>
   </header>
 
   <section id="features">
     <div class="sec-head">
-      <span class="eyebrow">What it does</span>
-      <h2>Everything you check before and during a game — in one place</h2>
-      <p>PIX watches the client and shows the right thing at the right moment: the lobby, champion select, the game itself.</p>
+      <span class="eyebrow" data-t="feat.eyebrow">Qué hace</span>
+      <h2 data-t="feat.title">Todo lo que revisas antes y durante la partida, en un solo lugar</h2>
+      <p data-t="feat.sub">PIX observa el cliente y muestra lo correcto en el momento justo: el lobby, la selección de campeón, la partida.</p>
     </div>
     <div class="grid">
-      <div class="card">
-        <div class="ic">🏆</div>
-        <h3>Profile &amp; rank</h3>
-        <p>Level, ranked tier with emblem, LP, win rate and your peak league — at a glance.</p>
-      </div>
-      <div class="card">
-        <div class="ic">📜</div>
-        <h3>Match history &amp; stats</h3>
-        <p>Recent games with KDA and per‑champion win rates, plus ARAM and ranked filters.</p>
-      </div>
-      <div class="card">
-        <div class="ic">🎯</div>
-        <h3>Champion‑select assistant</h3>
-        <p>Recommended picks for your role, runes, summoner spells, item build and a full skill‑order grid.</p>
-      </div>
-      <div class="card">
-        <div class="ic">🐉</div>
-        <h3>Live coach</h3>
-        <p>Dragon, Herald and Baron timers on the Rift, and composition analysis in ARAM.</p>
-      </div>
-      <div class="card">
-        <div class="ic">✨</div>
-        <h3>Mastery &amp; build explorer</h3>
-        <p>Your champion mastery, and a searchable explorer for any champion's build and runes by lane.</p>
-      </div>
-      <div class="card">
-        <div class="ic">🧘</div>
-        <h3>Post‑game &amp; tilt check</h3>
-        <p>Plain‑language summary of your last game, one thing to improve, and a gentle nudge on losing streaks.</p>
-      </div>
-      <div class="card">
-        <div class="ic">⚡</div>
-        <h3>Apply to client</h3>
-        <p>Push the suggested runes and item set straight into the League client with one click.</p>
-      </div>
-      <div class="card">
-        <div class="ic">🌐</div>
-        <h3>Español &amp; English</h3>
-        <p>Switch languages any time from the top bar — the whole interface follows.</p>
-      </div>
-      <div class="card">
-        <div class="ic">🔒</div>
-        <h3>Local &amp; private</h3>
-        <p>No shared server. Your key and data stay on your device and are never sent to anyone.</p>
-      </div>
+      <div class="card"><div class="ic">🏆</div><h3 data-t="f1.t">Perfil y rango</h3><p data-t="f1.d">Nivel, división con emblema, LP, winrate y tu mejor liga — de un vistazo.</p></div>
+      <div class="card"><div class="ic">📜</div><h3 data-t="f2.t">Historial y estadísticas</h3><p data-t="f2.d">Partidas recientes con KDA y winrate por campeón, con filtros de ARAM y clasificatoria.</p></div>
+      <div class="card"><div class="ic">🎯</div><h3 data-t="f3.t">Asistente de selección</h3><p data-t="f3.d">Campeones recomendados para tu rol, runas, hechizos, build y la matriz de subida de habilidades.</p></div>
+      <div class="card"><div class="ic">🐉</div><h3 data-t="f4.t">Coach en vivo</h3><p data-t="f4.d">Tiempos de dragón, heraldo y barón en la Grieta, y análisis de composición en ARAM.</p></div>
+      <div class="card"><div class="ic">📈</div><h3 data-t="f5.t">Coach de progreso</h3><p data-t="f5.d">Metas, tendencias y tu «foco de la semana» calculados con tus propios datos. No es un tablero: es un entrenador.</p></div>
+      <div class="card"><div class="ic">🚫</div><h3 data-t="f6.t">Bans y matchups tuyos</h3><p data-t="f6.d">Sugerencias de baneo según los campeones que <em>a ti</em> más te cuestan, sacadas de tu historial.</p></div>
+      <div class="card"><div class="ic">⚡</div><h3 data-t="f7.t">Aplicar al cliente</h3><p data-t="f7.d">Envía las runas y el set de objetos sugeridos directo al cliente de League con un clic.</p></div>
+      <div class="card"><div class="ic">🌐</div><h3 data-t="f8.t">Español e inglés</h3><p data-t="f8.d">Cambia de idioma cuando quieras desde la barra superior — toda la interfaz lo sigue.</p></div>
+      <div class="card"><div class="ic">🔒</div><h3 data-t="f9.t">Local y privado</h3><p data-t="f9.d">Sin servidor propio. Tu clave y tus datos se quedan en tu equipo y no se envían a nadie.</p></div>
     </div>
   </section>
 
   <section id="how">
     <div class="sec-head">
-      <span class="eyebrow">Get started</span>
-      <h2>Up and running in three steps</h2>
-      <p>No account to create, nothing to configure on a server. It runs next to your League client.</p>
+      <span class="eyebrow" data-t="how.eyebrow">Empezar</span>
+      <h2 data-t="how.title">Listo en tres pasos</h2>
+      <p data-t="how.sub">Sin cuenta que crear, nada que configurar en un servidor. Corre junto a tu cliente de League.</p>
     </div>
     <div class="steps">
-      <div class="step">
-        <span class="n">01</span>
-        <h3>Download &amp; install</h3>
-        <p>Grab the installer for your system and open PIX. The window opens next to your game.</p>
-      </div>
-      <div class="step">
-        <span class="n">02</span>
-        <h3>Paste your Riot API key</h3>
-        <p>Get a free key at <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> and paste it in Settings. It's stored locally.</p>
-      </div>
-      <div class="step">
-        <span class="n">03</span>
-        <h3>Open League and play</h3>
-        <p>PIX detects your account and game state automatically — profile, builds and coaching appear on their own.</p>
-      </div>
+      <div class="step"><span class="n">01</span><h3 data-t="s1.t">Descarga e instala</h3><p data-t="s1.d">Baja el instalador para tu sistema y abre PIX. La ventana se abre junto a tu juego.</p></div>
+      <div class="step"><span class="n">02</span><h3 data-t="s2.t">Pega tu clave de la Riot API</h3><p data-t="s2.d">Consigue una clave gratis en <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> y pégala en Ajustes. Se guarda en tu equipo.</p></div>
+      <div class="step"><span class="n">03</span><h3 data-t="s3.t">Abre League y juega</h3><p data-t="s3.d">PIX detecta tu cuenta y el estado del juego automáticamente — perfil, builds y coaching aparecen solos.</p></div>
     </div>
   </section>
 
@@ -320,8 +276,8 @@
     <div class="privacy">
       <span class="lock">🔒</span>
       <div>
-        <h3>Your data stays yours</h3>
-        <p>PIX runs entirely on your computer. It uses <b>your own</b> Riot API key, stored locally, to read <b>your</b> profile and matches — and nothing else. There is no PIX server, no account, and no tracking.</p>
+        <h3 data-t="priv.t">Tus datos son tuyos</h3>
+        <p data-t="priv.d">PIX corre por completo en tu computadora. Usa <b>tu propia</b> clave de la Riot API, guardada localmente, para leer <b>tu</b> perfil y tus partidas — y nada más. No hay servidor de PIX, ni cuenta, ni rastreo.</p>
       </div>
     </div>
   </section>
@@ -341,20 +297,83 @@
       </span>
       <span class="foot-links">
         <a href="https://github.com/vichinho/pix" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/vichinho/pix/releases/latest" target="_blank" rel="noopener">Download</a>
+        <a href="https://github.com/vichinho/pix/releases/latest" target="_blank" rel="noopener" data-t="foot.download">Descargar</a>
         <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">Riot Developer</a>
       </span>
     </div>
-    <p class="legal">
-      PIX isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone
-      officially involved in producing or managing Riot Games properties. Riot Games and all associated
-      properties are trademarks or registered trademarks of Riot Games, Inc. League of Legends © Riot Games, Inc.
+    <p class="legal" data-t="foot.legal">
+      PIX no está avalado por Riot Games ni refleja las opiniones o puntos de vista de Riot Games ni de
+      nadie oficialmente involucrado en la producción o gestión de las propiedades de Riot Games. Riot Games
+      y todas las propiedades asociadas son marcas comerciales o marcas registradas de Riot Games, Inc.
+      League of Legends © Riot Games, Inc.
     </p>
   </footer>
 </div>
 
 <script>
-  // Ambient pixie dust drifting upward — quiet, respects reduced motion.
+  // — Bilingüe ES/EN (español por defecto) —
+  var DICT = {
+    en: {
+      'nav.features': 'Features',
+      'nav.how': 'How it works',
+      'hero.eyebrow': 'League of Legends companion',
+      'hero.tagline': 'Your fairy companion on the Rift',
+      'hero.lede': 'A free desktop app that reads your League client and turns each session into a head start — your rank and stats, champion‑select builds and runes, a live objective coach, and honest post‑game feedback. All on your machine, with your own Riot API key.',
+      'hero.download': '↓ Download for Windows',
+      'hero.github': 'View on GitHub',
+      'hero.platforms': 'Free · <b>Windows</b> · macOS · Linux · Español &amp; English',
+      'feat.eyebrow': 'What it does',
+      'feat.title': 'Everything you check before and during a game — in one place',
+      'feat.sub': 'PIX watches the client and shows the right thing at the right moment: the lobby, champion select, the game itself.',
+      'f1.t': 'Profile &amp; rank', 'f1.d': 'Level, ranked tier with emblem, LP, win rate and your peak league — at a glance.',
+      'f2.t': 'Match history &amp; stats', 'f2.d': 'Recent games with KDA and per‑champion win rates, plus ARAM and ranked filters.',
+      'f3.t': 'Champion‑select assistant', 'f3.d': 'Recommended picks for your role, runes, summoner spells, item build and a full skill‑order grid.',
+      'f4.t': 'Live coach', 'f4.d': 'Dragon, Herald and Baron timers on the Rift, and composition analysis in ARAM.',
+      'f5.t': 'Progress coach', 'f5.d': 'Goals, trends and your “focus of the week”, computed from your own data. Not a dashboard — a coach.',
+      'f6.t': 'Your bans &amp; matchups', 'f6.d': 'Ban suggestions based on the champions <em>you</em> struggle against most, from your own history.',
+      'f7.t': 'Apply to client', 'f7.d': 'Push the suggested runes and item set straight into the League client with one click.',
+      'f8.t': 'Español &amp; English', 'f8.d': 'Switch languages any time from the top bar — the whole interface follows.',
+      'f9.t': 'Local &amp; private', 'f9.d': 'No shared server. Your key and data stay on your device and are never sent to anyone.',
+      'how.eyebrow': 'Get started',
+      'how.title': 'Up and running in three steps',
+      'how.sub': 'No account to create, nothing to configure on a server. It runs next to your League client.',
+      's1.t': 'Download &amp; install', 's1.d': 'Grab the installer for your system and open PIX. The window opens next to your game.',
+      's2.t': 'Paste your Riot API key', 's2.d': 'Get a free key at <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> and paste it in Settings. It\'s stored locally.',
+      's3.t': 'Open League and play', 's3.d': 'PIX detects your account and game state automatically — profile, builds and coaching appear on their own.',
+      'priv.t': 'Your data stays yours',
+      'priv.d': 'PIX runs entirely on your computer. It uses <b>your own</b> Riot API key, stored locally, to read <b>your</b> profile and matches — and nothing else. There is no PIX server, no account, and no tracking.',
+      'foot.download': 'Download',
+      'foot.legal': 'PIX isn\'t endorsed by Riot Games and doesn\'t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc. League of Legends © Riot Games, Inc.',
+    },
+  };
+
+  function applyLang(lang) {
+    document.documentElement.lang = lang;
+    var table = DICT[lang] || null;
+    if (table) {
+      document.querySelectorAll('[data-t]').forEach(function (el) {
+        var v = table[el.getAttribute('data-t')];
+        if (v != null) el.innerHTML = v;
+      });
+    }
+    document.querySelectorAll('.site-lang button').forEach(function (b) {
+      b.classList.toggle('on', b.getAttribute('data-lang') === lang);
+    });
+    try { localStorage.setItem('pix.site.lang', lang); } catch (e) { /* ignore */ }
+  }
+
+  (function () {
+    var stored = null;
+    try { stored = localStorage.getItem('pix.site.lang'); } catch (e) { /* ignore */ }
+    var initial = stored || 'es'; // español por defecto
+    // El HTML base ya está en español, así que solo reescribimos si toca inglés.
+    if (initial === 'en') applyLang('en'); else applyLang('es');
+    document.querySelectorAll('.site-lang button').forEach(function (b) {
+      b.addEventListener('click', function () { applyLang(b.getAttribute('data-lang')); });
+    });
+  })();
+
+  // Polvo mágico ambiental (respeta reduce-motion).
   (function () {
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var c = document.getElementById('dust');
@@ -362,7 +381,6 @@
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var W, H, parts;
     var colors = ['#F6C177', '#8FF0E8', '#F6A6D6'];
-
     function resize() {
       W = c.width = Math.floor(innerWidth * dpr);
       H = c.height = Math.floor(innerHeight * dpr);
@@ -391,11 +409,8 @@
         p.y -= p.s; p.x += p.drift; p.tw += 0.03;
         if (p.y < -10 * dpr) parts[i] = mk(false);
         var a = p.a * (0.6 + 0.4 * Math.sin(p.tw));
-        x.globalAlpha = a;
-        x.fillStyle = p.col;
-        x.beginPath();
-        x.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        x.fill();
+        x.globalAlpha = a; x.fillStyle = p.col;
+        x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI * 2); x.fill();
       }
       x.globalAlpha = 1;
       requestAnimationFrame(frame);
@@ -403,9 +418,6 @@
     resize();
     addEventListener('resize', resize);
     if (!reduce) frame();
-    else { // one static pass
-      for (var i = 0; i < parts.length; i++) { var p = parts[i]; x.globalAlpha = p.a; x.fillStyle = p.col; x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI*2); x.fill(); }
-      x.globalAlpha = 1;
-    }
+    else { for (var i = 0; i < parts.length; i++) { var p = parts[i]; x.globalAlpha = p.a; x.fillStyle = p.col; x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI*2); x.fill(); } x.globalAlpha = 1; }
   })();
 </script>
