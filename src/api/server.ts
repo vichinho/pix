@@ -27,6 +27,7 @@ import {
   CatalogArchetypeBuildProvider,
   DefaultBuildProvider,
 } from '../infrastructure/champions/archetype-build-provider.js';
+import { LolalyticsBuildProvider } from '../infrastructure/champions/lolalytics-build-provider.js';
 import { ChampionCatalog } from '../infrastructure/champions/champion-catalog.js';
 import { FallbackBuildProvider, type BuildProvider } from '../domain/build.js';
 import { ClientDetector } from '../infrastructure/lcu/client-detector.js';
@@ -159,6 +160,9 @@ export function createServer(deps: ServerDeps = {}): Express {
   const buildProvider =
     deps.buildProvider ??
     new FallbackBuildProvider([
+      // 0) Builds en tiempo real desde LoLalytics (scrapea SSR de Qwik, TTL 1h).
+      //    Si falla el fetch o no parsea, cae al siguiente proveedor sin error.
+      new LolalyticsBuildProvider(),
       // 1) Builds curadas específicas (máxima precisión).
       new SeedBuildProvider(),
       // 2) Build por SUBCLASE clasificada a mano para CADA campeón (cobertura total).
@@ -244,10 +248,6 @@ export function createServer(deps: ServerDeps = {}): Express {
     tagLine: string | undefined,
   ): Promise<PlayerIdentity | null> {
     if (gameName && tagLine) {
-      // No persistimos la identidad explícita aquí: aún no está verificada contra
-      // la Riot API, y persistir un Riot ID mal escrito dejaría al usuario atascado
-      // en un 404 en cargas posteriores. La persistencia del enlace manual la
-      // gestiona el frontend (localStorage); aquí sólo la usamos para esta petición.
       return { gameName, tagLine };
     }
     try {
@@ -454,16 +454,12 @@ export function createServer(deps: ServerDeps = {}): Express {
         return;
       }
 
-      // 2. Asegurar catálogo cargado (best-effort: si falla, el enriquecimiento
-      //    devolverá iconos null pero no rompe la respuesta)
+      // 2. Asegurar catálogo cargado (best-effort)
       await championCatalog.getData().catch(() => null);
 
-      // 3. Obtener build pasando rol ARAM para activar la lógica específica
-      //    (summoners Flash+Mark, ítems de ARAM, etc.)
+      // 3. Obtener build pasando rol ARAM
       const build = await getChampionBuild.execute(live.championId, 'ARAM');
 
-      // getChampionBuild nunca debería retornar null (DefaultBuildProvider como
-      // último recurso), pero lo manejamos por si acaso.
       if (!build) {
         res.status(404).json({
           error: 'build_not_found',
@@ -473,7 +469,7 @@ export function createServer(deps: ServerDeps = {}): Express {
         return;
       }
 
-      // 4. Enriquecer con iconos (best-effort: si falla devuelve build sin iconos)
+      // 4. Enriquecer con iconos (best-effort)
       let enriched;
       try {
         enriched = await enrichBuild(build, championCatalog);
@@ -680,8 +676,7 @@ export function createServer(deps: ServerDeps = {}): Express {
       }
       if (parsed.data.riotApiKey !== undefined) {
         const key = parsed.data.riotApiKey;
-        // Validamos la key contra la Riot API antes de guardarla, para dar
-        // feedback claro (una cuenta cualquiera vale como prueba de conexión).
+        // Validamos la key contra la Riot API antes de guardarla.
         const probe = makeRiotClient(key, defaultPlatform, defaultRegion);
         try {
           await probe.getAccountByRiotId('Riot Phreak', 'NA1');
@@ -690,7 +685,7 @@ export function createServer(deps: ServerDeps = {}): Express {
             res.status(400).json({ error: 'riot_api_key_invalid' });
             return;
           }
-          // Otros errores (404 de la cuenta de prueba, red…) => la key es válida.
+          // Otros errores (404, red…) => la key es válida.
         }
         settingsStore.set({ riotApiKey: key });
         reconfigureRiot(key);
