@@ -20,6 +20,7 @@ import { RunePageWriter, LcuUnavailableError } from '../infrastructure/lcu/rune-
 import { ApplyItemSetUseCase } from '../application/apply-item-set.js';
 import { ItemSetWriter } from '../infrastructure/lcu/item-set.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
+import { UggBuildProvider } from '../infrastructure/champions/ugg-build-provider.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
 import { ClassifiedBuildProvider } from '../infrastructure/champions/champion-archetypes.js';
 import {
@@ -159,14 +160,16 @@ export function createServer(deps: ServerDeps = {}): Express {
   const buildProvider =
     deps.buildProvider ??
     new FallbackBuildProvider([
-      // 1) Builds curadas específicas (máxima precisión).
+      // 1) U.GG: builds reales específicas por campeón y rol (sin red → null → siguiente).
+      new UggBuildProvider(),
+      // 2) Builds curadas a mano para campeones específicos.
       new SeedBuildProvider(),
-      // 2) Build por SUBCLASE clasificada a mano para CADA campeón (cobertura total).
+      // 3) Build por subclase clasificada a mano para cada campeón (cobertura total).
       new ClassifiedBuildProvider(championCatalog),
-      // 3) Respaldo por tags de Data Dragon y por rasgos de ARAM.
+      // 4) Respaldo por tags de Data Dragon y por rasgos de ARAM.
       new CatalogArchetypeBuildProvider(championCatalog),
       new ArchetypeBuildProvider(championTraits),
-      // 4) Último recurso: nunca deja a un campeón sin build.
+      // 5) Último recurso: nunca deja a un campeón sin build.
       new DefaultBuildProvider(),
     ]);
   const getChampionBuild = new GetChampionBuildUseCase(buildProvider);
@@ -244,10 +247,6 @@ export function createServer(deps: ServerDeps = {}): Express {
     tagLine: string | undefined,
   ): Promise<PlayerIdentity | null> {
     if (gameName && tagLine) {
-      // No persistimos la identidad explícita aquí: aún no está verificada contra
-      // la Riot API, y persistir un Riot ID mal escrito dejaría al usuario atascado
-      // en un 404 en cargas posteriores. La persistencia del enlace manual la
-      // gestiona el frontend (localStorage); aquí sólo la usamos para esta petición.
       return { gameName, tagLine };
     }
     try {
