@@ -1,263 +1,235 @@
-# PIX
+<p align="center">
+  <img src="docs/pix-icon-full.svg" alt="PIX" width="120" height="120" />
+</p>
 
-Companion app personal para **League of Legends**. Detecta el estado del cliente,
-muestra perfil e historial reciente y asiste durante champion select con
-recomendaciones de campeones y builds por línea.
+<h1 align="center">PIX</h1>
 
-Este repositorio contiene el **núcleo backend** del proyecto (Fase 0 → Fase 1 de la
-[especificación](docs/architecture.md)). El primer módulo implementado por completo
-es la **detección del cliente** (LCU), con contratos tipados, API local y tests.
+<p align="center"><em>Tu hada compañera en la Grieta.</em></p>
 
-> **Aviso legal:** PIX es un proyecto personal **no oficial**. No está
-> afiliado, asociado, autorizado ni patrocinado por Riot Games. League of Legends
-> y Riot Games son marcas registradas de Riot Games, Inc. La app es una herramienta
-> de apoyo visual y consulta: no lee memoria del juego, no inyecta código, no
-> automatiza decisiones ni acciones dentro de la partida.
+<p align="center">
+  App de escritorio <strong>gratuita y local</strong> para <strong>League of Legends</strong>: perfil, rango,
+  historial, builds y runas en selección de campeón, coach en vivo, coach de progreso
+  y asistente de baneos — todo con tu propia clave de la Riot API.
+</p>
 
-## Estado actual
+<p align="center">
+  <a href="https://vichinho.github.io/pix/">🌐 Sitio web</a> ·
+  <a href="https://github.com/vichinho/pix/releases/latest">⬇️ Descargar</a> ·
+  <a href="https://github.com/vichinho/pix/issues">🐛 Reportar un problema</a>
+</p>
 
-| Módulo | Estado |
-|---|---|
-| Detección del cliente (LCU lockfile + gameflow phase) | ✅ Implementado |
-| API local (`/api/client/status`) | ✅ Implementado |
-| Champion select (rol asignado, campeón elegido, bans) | ✅ Implementado |
-| Tipo de partida (casual/normal/ranked/flex/práctica/…) | ✅ Implementado |
-| Recomendaciones de campeones por rol (reglas) | ✅ Implementado |
-| Recomendaciones personalizadas por historial | ✅ Implementado |
-| Estadísticas de rendimiento reciente (winrate/KDA) | ✅ Implementado |
-| Análisis de composición ARAM + mejor opción de banca | ✅ Implementado |
-| Perfil e historial de partidas (Riot API) | ✅ Implementado |
-| Build del campeón (runas/items/hechizos/skill order) | ✅ Seed curada |
-| Interfaz web (dashboard) servida por el backend | ✅ Implementado |
-| Catálogo de campeones (nombre/icono, Data Dragon) | ✅ Implementado |
-| Runas + hechizos del campeón en champ select · build in-game | ✅ Implementado |
-| Detección del campeón en partida (Live Client API) | ✅ Implementado |
-| Iconos reales de ítems, hechizos y habilidades en la build | ✅ Implementado |
-| Página de runas con iconos al estilo LoL | ✅ Implementado |
-| Builds genéricas por clase (marksman/mago/tanque/…) | ✅ Implementado |
-| Build del campeón visible también en ARAM | ✅ Implementado |
-| Interfaz rediseñada (minimalista/profesional) | ✅ Implementado |
-| Builds | 🚧 Stub (501) |
-| Settings | 🚧 Stub (501) |
+<p align="center">
+  <img alt="Plataformas" src="https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-2E1856?style=flat-square" />
+  <img alt="Stack" src="https://img.shields.io/badge/Node.js%20%C2%B7%20TypeScript%20%C2%B7%20Electron-1A1033?style=flat-square" />
+  <img alt="Idiomas" src="https://img.shields.io/badge/i18n-Espa%C3%B1ol%20%2F%20English-8FF0E8?style=flat-square&labelColor=1A1033" />
+</p>
 
-## Stack
+> **Aviso legal.** PIX es un proyecto personal **no oficial**. No está afiliado,
+> asociado, autorizado ni patrocinado por Riot Games. *League of Legends* y *Riot Games*
+> son marcas registradas de Riot Games, Inc. PIX es una herramienta de apoyo visual y
+> consulta: **no** lee memoria del juego, **no** inyecta código y **no** automatiza
+> acciones dentro de la partida.
 
-- Node.js + TypeScript (ESM)
-- Express (backend local)
-- Zod (validación de configuración y contratos)
-- Vitest (tests)
+---
 
-La UI (React + Vite) y el shell de escritorio (Electron) se incorporarán en fases
-posteriores; el backend está diseñado para ser consumido por esa UI vía HTTP local.
+## Índice
 
-## Cómo funciona la detección del cliente
+- [¿Qué es PIX?](#qué-es-pix)
+- [Características](#características)
+- [Instalación (usuarios)](#instalación-usuarios)
+- [Cómo funciona](#cómo-funciona)
+- [Desarrollo](#desarrollo)
+- [Empaquetado y releases](#empaquetado-y-releases)
+- [API local](#api-local)
+- [Idiomas](#idiomas)
+- [Privacidad](#privacidad)
+- [Roadmap](#roadmap)
+- [Licencia](#licencia)
 
-Mientras el cliente de LoL está abierto, escribe un archivo `lockfile` con el
-formato `LeagueClient:<pid>:<port>:<password>:<protocol>`. El backend:
+---
 
-1. Localiza el `lockfile` según el SO (o vía `LOL_LOCKFILE_PATH`).
-2. Lo parsea para obtener puerto y credenciales locales (`src/infrastructure/lcu/lockfile.ts`).
-3. Se conecta al LCU en `127.0.0.1` con basic-auth (usuario `riot`) sobre el
-   certificado autofirmado de Riot (`lcu-connector.ts`).
-4. Consulta `/lol-gameflow/v1/gameflow-phase` y `/lol-summoner/v1/current-summoner`
-   y consolida un `ClientStatus` tolerante a fallos (`client-detector.ts`).
+## ¿Qué es PIX?
 
-Si el cliente está cerrado, `/api/client/status` responde `DISCONNECTED` sin errores.
+PIX es una **app de escritorio** que se ejecuta junto al cliente de League of Legends y
+convierte cada sesión en una ventaja. Detecta automáticamente en qué punto estás —menú,
+selección de campeón o partida— y muestra lo útil en cada momento: tu perfil y rango,
+tu historial, builds y runas recomendadas, un coach en vivo y feedback tras la partida.
 
-## Uso
+Todo corre **en tu equipo**. No hay servidor de PIX ni cuentas: usas **tu propia clave
+de la Riot API**, guardada localmente. A diferencia de las webs de estadísticas, PIX es
+**personal y en tiempo real** — lee tu cliente local y trabaja con *tus* datos.
+
+## Características
+
+### 🎯 En selección de campeón
+- **Campeones recomendados** para tu rol (motor de reglas: meta + comfort pick).
+- **Runas, hechizos, build e ítems** del campeón que eliges, con la **matriz de subida de habilidades** (niveles 1–18).
+- **Bans sugeridos para ti**: los campeones contra los que *tú* más pierdes, sacados de tu historial.
+- Aplica **runas** y **set de objetos** directo al cliente con un clic (LCU).
+
+### ⚔️ En partida
+- **Coach en vivo**: temporizadores de dragón, heraldo y barón, y avisos de power-spike (Live Client Data API).
+- **Análisis de composición en ARAM**: mezcla AD/AP, frontline, sustain y CC, qué le falta al equipo y la mejor elección de tu banca.
+- **Build completa** del campeón en juego, con iconos reales de ítems, hechizos y habilidades.
+
+### 📊 Fuera de partida
+- **Perfil y rango**: nivel, emblema de liga, LP, winrate y mejor liga histórica.
+- **Historial y estadísticas**: partidas recientes con KDA y winrate por campeón (filtros de ARAM y clasificatoria).
+- **Coach de progreso**: metas editables con tendencia (KDA, muertes, CS/min, visión), tu «foco de la semana» e insights (mejor campeón, mejor horario, peor matchup, marcador de hoy).
+- **Maestría de campeones** y **explorador de builds** para cualquier campeón por línea.
+- **Resumen post-partida** en lenguaje natural y **detector de tilt** (aviso ante rachas de derrotas).
+
+### 🧩 General
+- **Español e inglés**, con selector en la barra superior.
+- **100% local y privado**: sin servidor propio, sin cuentas, sin rastreo.
+- Interfaz oscura y minimalista, empaquetada como app nativa (Windows, macOS, Linux).
+
+## Instalación (usuarios)
+
+1. Descarga el instalador para tu sistema desde la [**última release**](https://github.com/vichinho/pix/releases/latest):
+   - **Windows** → `PIX-Setup-x.y.z.exe`
+   - **macOS** → `PIX-x.y.z-arm64.dmg`
+   - **Linux** → `PIX-x.y.z.AppImage`
+2. Ábrelo. En Windows, la primera vez aparecerá *"editor desconocido"* (la app no está firmada): **Más información → Ejecutar de todas formas**.
+3. Consigue una **Development API Key** gratis en [developer.riotgames.com](https://developer.riotgames.com/) (empieza por `RGAPI-`) y pégala en **⚙️ Ajustes** dentro de PIX.
+4. Abre el cliente de LoL — PIX detecta tu cuenta automáticamente.
+
+> ⚠️ Las claves de desarrollo de Riot **caducan cada 24 h**. Cuando expire, genera una nueva y vuelve a pegarla en Ajustes.
+
+## Cómo funciona
+
+PIX es un **backend local en Node.js** (Express) con una **UI web estática** (servida en
+`127.0.0.1`), todo empaquetado en un **shell de Electron**. Combina cuatro fuentes:
+
+| Fuente | Uso | Requiere clave |
+|---|---|---|
+| **LCU** (League Client API) | Estado del cliente, selección de campeón, aplicar runas/ítems | No |
+| **Live Client Data API** (`:2999`) | Campeón, objetivos y estado en partida | No |
+| **Riot API** (account/summoner/league/mastery/match) | Perfil, rango, maestría e historial | Sí (tu key) |
+| **Data Dragon** | Nombres, iconos, splash, runas y hechizos | No |
+
+- El **lockfile** del cliente da puerto y credenciales locales; PIX se conecta al LCU por
+  `127.0.0.1` con basic-auth sobre el certificado de Riot. Si el cliente está cerrado,
+  la API responde `DISCONNECTED` sin errores.
+- Los datos del usuario (ajustes, identidad, caché de partidas) se guardan en la **carpeta
+  de datos del sistema operativo**, fuera del paquete, para sobrevivir a las actualizaciones.
+
+Arquitectura limpia por capas: `domain` (contratos) → `application` (casos de uso) →
+`infrastructure` (LCU, Riot, Data Dragon, builds) → `api` (Express).
+
+## Desarrollo
+
+**Requisitos:** Node.js ≥ 20.
 
 ```bash
 npm install
-cp .env.example .env      # configura RIOT_API_KEY, región, etc.
+cp .env.example .env       # opcional: RIOT_API_KEY, región, locale…
 
-npm run dev               # backend + UI en modo watch
-npm run typecheck
-npm test
+npm run dev                # backend + UI en modo watch (http://127.0.0.1:3535)
+npm run typecheck          # TypeScript sin emitir
+npm test                   # tests con Vitest
+npm run lint               # ESLint
 ```
 
-Luego abre el **dashboard** en el navegador: **http://127.0.0.1:3535/**
+Abre el **dashboard** en `http://127.0.0.1:3535/`. La clave de la Riot API puede venir del
+`.env` (`RIOT_API_KEY`) o pegarse desde **Ajustes** en la propia interfaz.
 
-### App de escritorio (Electron)
-
-Para usar PIX como una app nativa (doble clic, sin navegador ni terminal) —ideal
-para compartir con amigos— hay un envoltorio de Electron que arranca el backend
-en un puerto local libre y abre una ventana propia:
-
-```bash
-npm run electron:dev          # compila y abre la app en modo desarrollo
-npm run electron:build        # genera un instalador para tu sistema operativo
-npm run electron:build:win    # fuerza el instalador de Windows (NSIS)
-npm run electron:build:mac    # DMG de macOS
-npm run electron:build:linux  # AppImage de Linux
-```
-
-Los instaladores quedan en `release/`. La clave de la Riot API se pega desde
-**Ajustes** dentro de la propia app (no hace falta `.env`) y los datos del usuario
-(ajustes, identidad, caché de partidas) se guardan en la carpeta de datos del
-sistema operativo, no dentro del paquete, para que sobrevivan a las
-actualizaciones.
-
-La UI (dark theme, sin paso de build) se sirve desde `public/` y consume la API local:
-muestra estado del cliente, perfil, historial y estadísticas. El panel de contexto es
-**dinámico**: en champ select muestra los campeones recomendados para tu línea y las
-runas/hechizos de tu pick (con nombre e icono del campeón); en ARAM, el análisis de
-composición; y ya **en partida**, la build completa del campeón. Es la base para migrar
-luego a React/Electron.
-
-Ejemplos de respuesta con el cliente cerrado:
-
-```bash
-curl http://127.0.0.1:3535/api/client/status
-# {"connected":false,"clientState":"DISCONNECTED","summoner":null,"lastUpdated":"..."}
-
-curl http://127.0.0.1:3535/api/champ-select/session
-# {"active":false,"session":null}
-```
-
-`/api/game/queue` clasifica el tipo de partida a partir del `queueId` que reporta el
-cliente. Categorías: `CASUAL_SWIFTPLAY` (eliges rol y campeón en la sala),
-`NORMAL_DRAFT` (normal/reclutamiento con picks y bans), `RANKED_SOLO`, `RANKED_FLEX`,
-`ARAM`, `CO_OP_VS_AI`, `CLASH`, `PRACTICE_TOOL`, `CUSTOM` y `OTHER`:
-
-```json
-{
-  "active": true,
-  "queue": {
-    "queueId": 420,
-    "category": "RANKED_SOLO",
-    "label": "Clasificatoria Solo/Dúo",
-    "isRanked": true,
-    "isPracticeTool": false,
-    "isCustom": false,
-    "gameMode": "CLASSIC",
-    "mapId": 11,
-    "rawName": "Clasificatoria Solo/Dúo",
-    "rawType": "RANKED_SOLO_5x5"
-  }
-}
-```
-
-`/api/recommendations` sugiere campeones por línea con un motor de reglas
-determinístico (base de meta + bono por comfort pick). Si no se pasa `?role=`,
-intenta detectar el rol desde champion select y excluye los campeones baneados:
-
-```bash
-curl "http://127.0.0.1:3535/api/recommendations?role=MIDDLE&limit=3"
-# {"role":"MIDDLE","recommendations":[
-#   {"championId":103,"championName":"Ahri","score":80,"reason":"meta_pick"}, ...]}
-```
-
-`/api/player/profile` y `/api/player/matches` usan la **Riot API oficial** (requieren
-`RIOT_API_KEY`). Resuelven tu identidad desde la query (`?gameName=&tagLine=`) o, si se
-omite, desde el cliente local. Sin key configurada devuelven `503 riot_not_configured`:
-
-```bash
-curl "http://127.0.0.1:3535/api/player/profile?gameName=Vishox&tagLine=LAS"
-# {"puuid":"...","gameName":"Vishox","tagLine":"LAS","summonerLevel":312,...}
-
-curl "http://127.0.0.1:3535/api/player/matches?gameName=Vishox&tagLine=LAS&count=5"
-# {"matches":[{"matchId":"LA1_1","championName":"Ahri","role":"MIDDLE","kills":8,...}]}
-```
-
-`/api/builds?championId=101&role=MIDDLE` devuelve la build recomendada (hechizos,
-página de runas, ítems iniciales/core/situacionales y orden de habilidades). Usa un
-**proveedor abstraído** (`BuildProvider`) con una **seed curada local** como fallback;
-los campeones aún no cubiertos responden `404 build_not_found`.
-
-```bash
-curl "http://127.0.0.1:3535/api/builds?championId=101&role=MIDDLE"
-# {"championName":"Xerath","runes":{"keystone":"Cometa Arcano",...},"coreItems":[...],"skillOrder":["Q","W","E"],"source":"curated"}
-```
-
-> Las builds son curadas (marcadas `patch:"curado"`), pensadas como fallback y punto
-> de partida ajustable por parche; la arquitectura permite anteponer un proveedor
-> externo (op.gg/u.gg u otra fuente) vía `FallbackBuildProvider`.
-
-`/api/aram/analysis` (sólo en ARAM, normal o de evento) lee tu equipo y la **banca**
-de campeones, analiza la **composición** (mezcla AD/AP, frontline, sustain/curación,
-CC, poke), dice si está **equilibrada o qué le falta**, y recomienda la **mejor opción**
-disponible (tu campeón actual o uno de la banca) para cubrir los huecos del equipo:
-
-```jsonc
-{
-  "isAram": true,
-  "currentComp": {
-    "balanced": false,
-    "missing": ["daño mágico (equipo demasiado AD)", "un frontline / tanque", "sustain o curación (clave en ARAM)"],
-    "strengths": ["composición de poke fuerte"]
-  },
-  "bestOption": {
-    "championId": 54, "championName": "Malphite", "fitScore": 100,
-    "fillsGaps": ["aporta daño mágico", "aporta frontline", "aporta engage"]
-  }
-  // ...team, bench, options
-}
-```
-
-> Cobertura: el análisis usa un dataset curado de campeones. Los que aún no estén
-> en el dataset se marcan con `"unknown": true` y no se evalúan (se informa aparte).
-
-`/api/player/stats` resume tu rendimiento reciente (winrate y KDA por campeón y por
-rol). Y `/api/recommendations?personalized=true` combina el pool meta con tu historial:
-tus campeones dominados en el rol (≥2 partidas) entran como candidatos y suben por
-comfort + winrate (requiere `RIOT_API_KEY`):
-
-```bash
-curl "http://127.0.0.1:3535/api/player/stats"
-# {"totalGames":20,"winRate":0.55,"byChampion":[{"championName":"Syndra","games":6,"winRate":0.66,"kda":3.1},...],"byRole":[...]}
-
-curl "http://127.0.0.1:3535/api/recommendations?personalized=true&role=MIDDLE"
-# {"role":"MIDDLE","recommendations":[...],"personalized":true,"basedOnGames":20}
-```
-
-Durante champion select, `/api/champ-select/session` devuelve `active:true` con el
-rol asignado, el campeón elegido, si el pick está confirmado y los bans:
-
-```json
-{
-  "active": true,
-  "session": {
-    "phase": "BAN_PICK",
-    "assignedRole": "MIDDLE",
-    "localPlayerCellId": 2,
-    "selectedChampionId": 103,
-    "pickCompleted": false,
-    "bans": [17, 55]
-  }
-}
-```
-
-## Estructura
+### Estructura
 
 ```text
 src/
-├─ domain/            # Contratos/entidades compartidas (types.ts)
-├─ application/       # Casos de uso (get-client-status.ts)
+├─ domain/            # Contratos y entidades compartidas
+├─ application/       # Casos de uso (perfil, historial, builds, ARAM, recomendaciones…)
 ├─ infrastructure/
 │  ├─ lcu/            # Lockfile, conector, detector, champ select, ARAM, cola
-│  ├─ riot/           # Cliente de la Riot API (account, summoner, match)
-│  └─ champions/      # Seed de pool, metadatos y builds de campeones
-public/               # UI web estática (dashboard): index.html, styles.css, app.js
+│  ├─ live/           # Live Client Data API (partida en curso)
+│  ├─ riot/           # Cliente de la Riot API (account, summoner, league, mastery, match)
+│  ├─ champions/      # Pool, arquetipos y proveedores de builds
+│  └─ persistence/    # Identidad y ajustes en disco
 ├─ api/               # Servidor Express y rutas locales
 ├─ config/            # Carga y validación de configuración (Zod)
-└─ index.ts           # Punto de entrada del backend
+└─ index.ts           # Punto de entrada / startServer()
+public/               # UI web estática: index.html, styles.css, app.js, i18n.js
+electron/             # Proceso principal y preload de la app de escritorio
+site/                 # Landing (GitHub Pages)
 tests/                # Tests unitarios (Vitest)
-docs/                 # Arquitectura y decisiones
+docs/                 # Arquitectura, decisiones y assets del logo
 ```
 
-## Idiomas (i18n)
+## Empaquetado y releases
 
-La interfaz está disponible en **español e inglés**, con un selector ES/EN en la
-barra superior (se recuerda entre sesiones). El sistema vive en `public/i18n.js`
-con el patrón "texto como clave": el español es la clave y el fallback, y solo se
-sustituye por inglés cuando corresponde. Los datos de campeones/objetos vienen de
-Data Dragon en el idioma configurado en el backend; los consejos curados por
-campeón (`public/champion-tips.js`) están por ahora solo en español.
+La app se empaqueta con **electron-builder**:
 
-## Próximos pasos
+```bash
+npm run electron:dev          # compila y abre la app en desarrollo
+npm run electron:build        # instalador para tu sistema (queda en release/)
+npm run electron:build:win    # NSIS (Windows)
+npm run electron:build:mac    # DMG (macOS)
+npm run electron:build:linux  # AppImage (Linux)
+```
 
-Integrar Riot API (perfil + historial), lectura de la sesión de champion select,
-motor de recomendaciones por reglas y proveedor de builds con fallback local, app
-de escritorio (Electron) e internacionalización ES/EN — ya implementados. Pendiente
-de cara a publicar: traducir los consejos por campeón al inglés, firma de código de
-los instaladores y auto-actualización.
+**Releases automáticas.** Empujar un tag `vX.Y.Z` (o lanzar el workflow *Construir y
+publicar instaladores*) compila en runners de GitHub para Windows, macOS y Linux y
+publica los instaladores en la [Release](https://github.com/vichinho/pix/releases)
+correspondiente. La **landing** (`site/`) se despliega a GitHub Pages en cada cambio.
+
+## API local
+
+Todas las rutas viven bajo `http://127.0.0.1:3535/api`. Las que usan la Riot API
+requieren `RIOT_API_KEY` (o clave configurada en Ajustes); sin ella responden
+`503 riot_not_configured`.
+
+| Ruta | Descripción |
+|---|---|
+| `GET /api/client/status` | Estado del cliente (LCU). |
+| `GET /api/game/queue` | Tipo de cola/partida (ranked, ARAM, práctica…). |
+| `GET /api/champ-select/session` | Rol, campeón elegido, bans y fase. |
+| `GET /api/recommendations` | Campeones sugeridos por rol (`?personalized=true` usa tu historial). |
+| `GET /api/builds` | Build del campeón (runas, ítems, hechizos, skill order). |
+| `GET /api/aram/analysis` | Análisis de composición y mejor opción de banca. |
+| `GET /api/live/champion` · `GET /api/live/game` | Campeón y estado de la partida en curso. |
+| `GET /api/player/profile` · `/matches` · `/stats` · `/mastery` | Perfil, historial, estadísticas y maestría (Riot API). |
+| `POST /api/runes/apply` · `POST /api/items/apply` | Aplica runas / set de ítems al cliente. |
+| `GET · PUT /api/settings` | Estado y configuración de la clave de la Riot API. |
+
+```bash
+curl http://127.0.0.1:3535/api/client/status
+# {"connected":false,"clientState":"DISCONNECTED","summoner":null,...}
+
+curl "http://127.0.0.1:3535/api/builds?championId=101&role=MIDDLE"
+# {"championName":"Xerath","runes":{...},"coreItems":[...],"skillOrder":["Q","W","E"],"source":"curated"}
+```
+
+> Las builds combinan una **cadena de proveedores** con fallback: seed curada →
+> clasificación por campeón → arquetipo por clase → genérica. La arquitectura permite
+> anteponer una fuente externa vía `FallbackBuildProvider`.
+
+## Idiomas
+
+La interfaz está en **español e inglés**, con selector ES/EN en la barra superior (se
+recuerda entre sesiones). El sistema vive en `public/i18n.js` con el patrón «texto como
+clave»: el español es la clave y el *fallback*, y solo se sustituye por inglés cuando
+corresponde. Los nombres de campeones/objetos vienen de Data Dragon; los consejos curados
+por campeón están por ahora en español.
+
+## Privacidad
+
+PIX corre por completo en tu computadora. Usa **tu propia** clave de la Riot API, guardada
+localmente, para leer **tu** perfil y tus partidas — y nada más. No hay servidor de PIX,
+ni cuentas, ni telemetría.
+
+## Roadmap
+
+- [x] Detección del cliente, champ select, tipo de cola y coach en vivo (LCU + Live Client).
+- [x] Perfil, historial, estadísticas y maestría (Riot API).
+- [x] Builds con proveedores en cascada, runas/ítems aplicables al cliente.
+- [x] Coach de progreso y asistente de baneos personalizado.
+- [x] App de escritorio (Electron) e internacionalización ES/EN.
+- [ ] Traducir los consejos por campeón al inglés.
+- [ ] Firma de código de los instaladores y auto-actualización.
+- [ ] Récord contra tu rival de línea y guía de matchup.
+
+## Licencia
+
+Proyecto personal de uso no comercial. *League of Legends* © Riot Games, Inc. PIX no está
+avalado por Riot Games ni refleja sus opiniones.
