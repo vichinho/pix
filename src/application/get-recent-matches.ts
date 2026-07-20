@@ -28,6 +28,15 @@ export class GetRecentMatchesUseCase {
     const me = match.info.participants.find((p) => p.puuid === puuid);
     if (!me) return null;
 
+    // El equipo rival son los participantes con resultado opuesto (5v5 → 5).
+    const enemyParts = match.info.participants.filter((p) => p.win !== me.win);
+    const enemies = enemyParts.map((p) => p.championId);
+    // Rival de línea: mismo teamPosition en el equipo contrario (si se conoce).
+    const myPos = (me.teamPosition ?? '').toUpperCase();
+    const laneOpponentId = myPos
+      ? enemyParts.find((p) => (p.teamPosition ?? '').toUpperCase() === myPos)?.championId
+      : undefined;
+
     const playedAtMs = match.info.gameEndTimestamp ?? match.info.gameCreation;
     return {
       matchId: match.metadata.matchId,
@@ -50,6 +59,8 @@ export class GetRecentMatchesUseCase {
       gold: me.goldEarned ?? 0,
       damage: me.totalDamageDealtToChampions ?? 0,
       visionScore: me.visionScore ?? 0,
+      enemies,
+      ...(laneOpponentId !== undefined ? { laneOpponentId } : {}),
     };
   }
 }

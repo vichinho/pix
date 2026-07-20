@@ -950,6 +950,7 @@ async function refreshMatches() {
   renderStatsFromMatches();
   renderLastGameSummary();
   renderTiltAlert();
+  refreshProgress();
 
   // Tanda completa en segundo plano (el backend cachea, así que sólo trae las
   // partidas nuevas). Al terminar, refresca historial y estadísticas.
@@ -1076,6 +1077,301 @@ function renderSkillMatrix(b) {
     <div class="skill-matrix-wrap"><div class="skill-matrix">${head}${body}</div></div></div>`;
 }
 
+// --- Coach de progreso --------------------------------------------------
+// Todo se calcula del historial ya cargado (matchState.all); no hay peticiones
+// extra ni red. Las metas se guardan en localStorage.
+
+/** Metas por defecto; la de visión sube si sueles ir de support. */
+function defaultGoals() {
+  const supportish = matchState.all.filter((m) => m.role === 'UTILITY').length >= matchState.all.length * 0.4;
+  return { kda: 3, deaths: 5, csmin: 6, vision: supportish ? 25 : 15 };
+}
+function getGoals() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('pix:goals') || '{}');
+    return { ...defaultGoals(), ...raw };
+  } catch { return defaultGoals(); }
+}
+function setGoal(key, value) {
+  const g = getGoals();
+  g[key] = value;
+  try { localStorage.setItem('pix:goals', JSON.stringify(g)); } catch { /* best-effort */ }
+}
+
+const avgOf = (arr, fn) => (arr.length ? arr.reduce((s, x) => s + fn(x), 0) / arr.length : 0);
+
+/** Mini-gráfico de tendencia (SVG) de una serie de valores (antiguo→reciente). */
+function sparkline(values, good) {
+  if (!values || values.length < 2) return '';
+  const w = 56, h = 18, pad = 2;
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const cls = good ? 'spark-good' : 'spark-bad';
+  const last = values[values.length - 1], first = values[0];
+  const trendCls = last >= first ? 'up' : 'down';
+  return `<svg class="spark ${cls} ${trendCls}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+}
+
+/**
+ * Calcula las métricas de progreso: promedio reciente vs anterior, tendencia y
+ * cumplimiento de metas. Devuelve null si no hay datos suficientes.
+ */
+function computeProgress() {
+  const all = matchState.all;
+  if (!all || all.length < 3) return null;
+  const goals = getGoals();
+  const recent = all.slice(0, 10);
+  const older = all.slice(10, 20);
+  const noAram = (arr) => arr.filter((m) => !isAramQueue(m.queueId));
+
+  const metric = (fn, arrRecent, arrOlder, target, higherBetter) => {
+    const cur = avgOf(arrRecent, fn);
+    const prev = arrOlder.length ? avgOf(arrOlder, fn) : cur;
+    const series = arrRecent.slice(0, 12).map(fn).reverse();
+    const met = higherBetter ? cur >= target : cur <= target;
+    // progreso 0..1 respecto a la meta (para la barra)
+    const prog = higherBetter
+      ? Math.max(0, Math.min(1, cur / target))
+      : Math.max(0, Math.min(1, target / Math.max(0.1, cur)));
+    return { cur, prev, series, target, met, prog, higherBetter };
+  };
+
+  const csR = noAram(recent), csO = noAram(older);
+  return {
+    count: all.length,
+    kda: metric(kdaOf, recent, older, goals.kda, true),
+    deaths: metric((m) => m.deaths, recent, older, goals.deaths, false),
+    csmin: metric(csmOf, csR, csO, goals.csmin, true),
+    vision: metric((m) => m.visionScore || 0, recent, older, goals.vision, true),
+  };
+}
+
+const GOAL_META = {
+  kda:    { key: 'kda',    label: 'KDA',        step: '0.5', fmt: (v) => v.toFixed(2) },
+  deaths: { key: 'deaths', label: 'Muertes',    step: '1',   fmt: (v) => v.toFixed(1) },
+  csmin:  { key: 'csmin',  label: 'CS/min',     step: '0.5', fmt: (v) => v.toFixed(1) },
+  vision: { key: 'vision', label: 'Visión',     step: '1',   fmt: (v) => Math.round(v) },
+};
+
+/** Elige el "foco" de mejora: la meta más lejos de cumplirse. */
+function focusInsight(p) {
+  const cards = ['kda', 'deaths', 'csmin', 'vision'].map((k) => ({ k, ...p[k] }));
+  const pending = cards.filter((c) => !c.met);
+  const pick = (pending.length ? pending : cards).sort((a, b) => a.prog - b.prog)[0];
+  const tips = {
+    kda: 'Elige mejor tus peleas: entra cuando tengas ventaja numérica o de objetos.',
+    deaths: 'Baja tus muertes: respeta el rango enemigo y no fuerces jugadas sin visión.',
+    csmin: 'Sube tu farmeo: no descuides súbditos entre jugadas, el oro constante suma.',
+    vision: 'Sube tu visión: coloca y limpia guardianes alrededor de los objetivos.',
+  };
+  return { key: pick.k, tip: tips[pick.k] };
+}
+
+/** Racha actual (V/D consecutivas desde la más reciente). */
+function currentStreak() {
+  const all = matchState.all;
+  if (!all.length) return { n: 0, win: false };
+  const win = all[0].win;
+  let n = 0;
+  for (const m of all) { if (m.win === win) n++; else break; }
+  return { n, win };
+}
+
+/** Mejor y peor campeón por winrate (con un mínimo de partidas). */
+function championRecords(minGames = 3) {
+  const by = new Map();
+  for (const m of matchState.all) {
+    let e = by.get(m.championId);
+    if (!e) { e = { championId: m.championId, name: m.championName || champName(m.championId), games: 0, wins: 0 }; by.set(m.championId, e); }
+    e.games += 1; if (m.win) e.wins += 1;
+  }
+  const list = [...by.values()].filter((e) => e.games >= minGames).map((e) => ({ ...e, wr: e.wins / e.games }));
+  if (!list.length) return { best: null, worst: null };
+  const byWr = [...list].sort((a, b) => b.wr - a.wr || b.games - a.games);
+  const best = byWr[0];
+  const wc = byWr[byWr.length - 1];
+  const worst = wc && wc.wr <= 0.45 && wc.championId !== best.championId ? wc : null;
+  return { best, worst };
+}
+
+/** Récord por campeón enemigo enfrentado (de m.enemies del historial). */
+function enemyRecords() {
+  const by = new Map();
+  for (const m of matchState.all) {
+    for (const eid of (m.enemies || [])) {
+      let e = by.get(eid);
+      if (!e) { e = { championId: eid, games: 0, wins: 0 }; by.set(eid, e); }
+      e.games += 1; if (m.win) e.wins += 1;
+    }
+  }
+  return by;
+}
+
+/** Tu récord cuando enfrentas a un campeón concreto, o null. */
+function recordVs(championId) {
+  const e = enemyRecords().get(Number(championId));
+  return e && e.games ? { ...e, wr: e.wins / e.games } : null;
+}
+
+/** Campeones que más te cuestan: peor winrate entre enemigos frecuentes. */
+function banSuggestions(n = 3, minGames = 3) {
+  return [...enemyRecords().values()]
+    .filter((e) => e.games >= minGames)
+    .map((e) => ({ ...e, wr: e.wins / e.games }))
+    .sort((a, b) => a.wr - b.wr || b.games - a.games)
+    .slice(0, n);
+}
+
+/** Franjas horarias (hora local del jugador). */
+const TIME_SLOTS = [
+  { key: 'Madrugada', from: 0, to: 6 },
+  { key: 'Mañana', from: 6, to: 12 },
+  { key: 'Tarde', from: 12, to: 18 },
+  { key: 'Noche', from: 18, to: 24 },
+];
+/** Franja horaria con mejor winrate (mínimo de partidas). */
+function bestTimeSlot(minGames = 3) {
+  const buckets = {};
+  for (const m of matchState.all) {
+    if (!m.playedAt) continue;
+    const h = new Date(m.playedAt).getHours();
+    const slot = TIME_SLOTS.find((s) => h >= s.from && h < s.to);
+    if (!slot) continue;
+    const b = buckets[slot.key] || (buckets[slot.key] = { games: 0, wins: 0 });
+    b.games += 1; if (m.win) b.wins += 1;
+  }
+  let best = null;
+  for (const [key, b] of Object.entries(buckets)) {
+    if (b.games < minGames) continue;
+    const wr = b.wins / b.games;
+    if (!best || wr > best.wr) best = { key, wr, games: b.games };
+  }
+  return best;
+}
+
+/** Marcador de hoy (V–D), o null si no jugaste hoy. */
+function todayRecord() {
+  const now = new Date();
+  let w = 0, l = 0;
+  for (const m of matchState.all) {
+    if (!m.playedAt) continue;
+    const d = new Date(m.playedAt);
+    if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+      if (m.win) w += 1; else l += 1;
+    }
+  }
+  return (w + l) ? { w, l } : null;
+}
+
+/** Chip de insight: icono + etiqueta + valor (con opcional icono de campeón y WR). */
+function insightChip(ico, label, valueHtml, wr, tone) {
+  const wrBadge = wr != null ? `<b class="pi-wr ${tone || ''}">${wr}%</b>` : '';
+  return `<div class="pg-insight">
+    <span class="pi-ico">${ico}</span>
+    <div class="pi-body">
+      <span class="pi-label">${esc(label)}</span>
+      <span class="pi-val">${valueHtml} ${wrBadge}</span>
+    </div>
+  </div>`;
+}
+
+/** Icono pequeño de campeón para los insights. */
+function champIconMini(id) {
+  const url = champIconUrl(id);
+  return url ? `<img class="pi-champ" src="${esc(url)}" alt="" loading="lazy"/>` : '';
+}
+
+/** Panel del coach de progreso; se inyecta arriba del explorador cuando estás inactivo. */
+function renderProgressInto(el) {
+  if (!el) return;
+  const p = computeProgress();
+  if (!p) {
+    el.innerHTML = riotConfigured
+      ? `<div class="pg-empty muted">${T('Juega algunas partidas para ver tu progreso aquí.')}</div>`
+      : '';
+    return;
+  }
+
+  // Forma reciente (últimas 10, izquierda = más reciente).
+  const form = matchState.all.slice(0, 10)
+    .map((m) => `<span class="form-pip ${m.win ? 'w' : 'l'}" data-tip="${esc((m.championName || champName(m.championId)) + ' · ' + (m.win ? T('Victoria') : T('Derrota')))}"></span>`)
+    .join('');
+  const st = currentStreak();
+  const streakTxt = st.n >= 2
+    ? T('{n} {res} seguidas', { n: st.n, res: st.win ? T('victorias') : T('derrotas') })
+    : '';
+
+  // Tarjetas de metas.
+  const goalCard = (k) => {
+    const m = p[k], meta = GOAL_META[k];
+    const arrow = m.cur === m.prev ? '' : (m.cur > m.prev
+      ? `<span class="pg-delta ${meta.key === 'deaths' ? 'bad' : 'good'}">▲</span>`
+      : `<span class="pg-delta ${meta.key === 'deaths' ? 'good' : 'bad'}">▼</span>`);
+    return `<div class="pg-goal ${m.met ? 'met' : ''}">
+      <div class="pg-goal-head">
+        <span class="pg-goal-label">${T(meta.label)}</span>
+        ${m.met ? '<span class="pg-badge">✓</span>' : ''}
+      </div>
+      <div class="pg-goal-val">${meta.fmt(m.cur)} ${arrow} ${sparkline(m.series, meta.key !== 'deaths')}</div>
+      <div class="pg-bar"><div class="pg-bar-fill ${m.met ? 'ok' : ''}" style="width:${Math.round(m.prog * 100)}%"></div></div>
+      <label class="pg-goal-target">${T('Meta')} <input type="number" class="pg-target" data-goal="${meta.key}" value="${m.target}" step="${meta.step}" min="0" inputmode="decimal"/></label>
+    </div>`;
+  };
+
+  const focus = focusInsight(p);
+
+  // Insights: mejor campeón, "ojo con", mejor horario, marcador de hoy.
+  const rec = championRecords();
+  const slot = bestTimeSlot();
+  const today = todayRecord();
+  const chips = [];
+  if (rec.best) chips.push(insightChip('🏅', T('Mejor campeón'), champIconMini(rec.best.championId) + esc(rec.best.name), Math.round(rec.best.wr * 100), 'good'));
+  if (rec.worst) chips.push(insightChip('⚠️', T('Ojo con'), champIconMini(rec.worst.championId) + esc(rec.worst.name), Math.round(rec.worst.wr * 100), 'bad'));
+  if (slot) chips.push(insightChip('⏰', T('Mejor horario'), T(slot.key), Math.round(slot.wr * 100), 'good'));
+  const worstMu = banSuggestions(1)[0];
+  if (worstMu) chips.push(insightChip('🧨', T('Peor matchup'), champIconMini(worstMu.championId) + esc(champName(worstMu.championId)), Math.round(worstMu.wr * 100), 'bad'));
+  if (today) chips.push(insightChip('📅', T('Hoy'), `${today.w}–${today.l}`, null, ''));
+  const insightsHtml = chips.length ? `<div class="pg-insights">${chips.join('')}</div>` : '';
+
+  el.innerHTML = `
+    <div class="pg-head">
+      <span class="pg-title">${T('Tu progreso')}</span>
+      <span class="pg-sub muted">${T('últimas {n} partidas', { n: Math.min(10, p.count) })}</span>
+    </div>
+    <div class="pg-form">
+      <div class="form-pips">${form}</div>
+      ${streakTxt ? `<span class="pg-streak ${st.win ? 'w' : 'l'}">${streakTxt}</span>` : ''}
+    </div>
+    <div class="pg-goals">
+      ${['kda', 'deaths', 'csmin', 'vision'].map(goalCard).join('')}
+    </div>
+    ${insightsHtml}
+    <div class="pg-focus">
+      <span class="pg-focus-ico">🎯</span>
+      <div><span class="pg-focus-label">${T('Foco de la semana')}: ${T(GOAL_META[focus.key].label)}</span>
+      <span class="pg-focus-tip">${T(focus.tip)}</span></div>
+    </div>`;
+
+  el.querySelectorAll('.pg-target').forEach((inp) => {
+    inp.addEventListener('change', () => {
+      const v = parseFloat(inp.value);
+      if (Number.isFinite(v) && v >= 0) { setGoal(inp.dataset.goal, v); refreshProgress(); }
+    });
+    inp.addEventListener('click', (e) => e.stopPropagation());
+  });
+}
+
+/** Refresca el panel de progreso si está visible (tras cargar partidas o cambiar metas). */
+function refreshProgress() {
+  const el = document.getElementById('progressPanel');
+  if (el) renderProgressInto(el);
+}
+
 // --- Contexto -----------------------------------------------------------
 async function refreshContext(clientState) {
   // La Live Client API (puerto 2999) es independiente del LCU: funciona incluso
@@ -1132,11 +1428,15 @@ function renderIdleContext() {
       </div>`
     : '';
   $('contextBody').innerHTML = `
+    <div id="progressPanel" class="progress-panel"></div>
+    <div class="idle-section-head">${T('Explorar builds')}</div>
     <div class="muted" style="margin-bottom:.6rem">${T('No estás en partida. Busca cualquier campeón para ver su build, runas y orden de subida:')}</div>
     ${quick}
     <input id="champSearch" class="champ-search" type="text" placeholder="${esc(T('Buscar campeón…'))}" autocomplete="off" spellcheck="false"/>
     <div id="champGrid" class="champ-grid">${tiles}</div>
     <div id="champBuildView" class="champ-build-view"></div>`;
+
+  renderProgressInto($('progressPanel'));
 
   const search = $('champSearch');
   const grid = $('champGrid');
@@ -1316,6 +1616,20 @@ document.addEventListener('mouseover', (e) => {
 document.addEventListener('mousemove', (e) => { if (tipTarget) positionTip(e.clientX, e.clientY); });
 window.addEventListener('scroll', hideTip, true);
 
+/** Bloque de bans sugeridos según tu historial (los que más te cuestan). */
+function renderBanSuggestions() {
+  const bans = banSuggestions(3);
+  if (!bans.length) return '';
+  const items = bans.map((b) => {
+    const wr = Math.round(b.wr * 100);
+    const tip = `${champName(b.championId)} · ${T('{n} partidas', { n: b.games })} · ${wr}% WR`;
+    return `<div class="ban-sugg" data-tip="${esc(tip)}">${champChip(b.championId, 22)}<span class="ban-wr loss">${wr}%</span></div>`;
+  }).join('');
+  return `<div class="block"><div class="label">${T('Bans sugeridos para ti')}</div>
+    <div class="ban-list">${items}</div>
+    <div class="ban-note muted">${T('Campeones contra los que más pierdes últimamente.')}</div></div>`;
+}
+
 async function refreshChampSelect() {
   $('contextTitle').textContent = 'Champion Select';
   const { data } = await api('/api/champ-select/session');
@@ -1342,6 +1656,7 @@ async function refreshChampSelect() {
       <span class="k">${T('Bans')}</span><span class="iconrow">${(s.bans || []).map((b) => champChip(b, 18)).join(' ') || '—'}</span>
     </div>
     ${pickHtml}
+    ${renderBanSuggestions()}
     <div class="block"><div class="label">${T('Sugerencias para tu rol')}</div>${recHtml}</div>`;
 }
 

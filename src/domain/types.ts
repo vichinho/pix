@@ -84,6 +84,10 @@ export interface MatchSummary {
   damage: number;
   /** Puntuación de visión. */
   visionScore: number;
+  /** Campeones del equipo rival (para matchups y sugerencias de baneo). */
+  enemies: number[];
+  /** Campeón rival en tu misma línea, si se pudo determinar. */
+  laneOpponentId?: number;
 }
 
 /** Contrato: estado del cliente (GET /api/client/status). */
