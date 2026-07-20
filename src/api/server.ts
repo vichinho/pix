@@ -20,7 +20,7 @@ import { RunePageWriter, LcuUnavailableError } from '../infrastructure/lcu/rune-
 import { ApplyItemSetUseCase } from '../application/apply-item-set.js';
 import { ItemSetWriter } from '../infrastructure/lcu/item-set.js';
 import { LiveGameReader } from '../infrastructure/live/live-game-reader.js';
-import { UggBuildProvider } from '../infrastructure/champions/ugg-build-provider.js';
+import { MerakiBuildProvider } from '../infrastructure/champions/ugg-build-provider.js';
 import { SeedBuildProvider } from '../infrastructure/champions/seed-build-provider.js';
 import { ClassifiedBuildProvider } from '../infrastructure/champions/champion-archetypes.js';
 import {
@@ -160,8 +160,8 @@ export function createServer(deps: ServerDeps = {}): Express {
   const buildProvider =
     deps.buildProvider ??
     new FallbackBuildProvider([
-      // 1) U.GG: builds reales específicas por campeón y rol (sin red → null → siguiente).
-      new UggBuildProvider(),
+      // 1) Meraki Analytics: ítems recomendados por Riot, sin Cloudflare, sin API key.
+      new MerakiBuildProvider(),
       // 2) Builds curadas a mano para campeones específicos.
       new SeedBuildProvider(),
       // 3) Build por subclase clasificada a mano para cada campeón (cobertura total).
@@ -179,8 +179,6 @@ export function createServer(deps: ServerDeps = {}): Express {
   const applyItemSet = new ApplyItemSetUseCase(buildProvider, itemSetWriter);
   const getLiveChampion = new GetLiveChampionUseCase(liveGameReader, championCatalog);
   const getLiveGameState = new GetLiveGameStateUseCase(liveGameReader);
-  // La Riot API se puede configurar en caliente (pantalla de Ajustes): la key se
-  // guarda en el SettingsStore y el cliente Riot se reconstruye sin reiniciar.
   const settingsStore = deps.settingsStore ?? new MemorySettingsStore();
   const defaultPlatform = deps.riotPlatform ?? 'la1';
   const defaultRegion = deps.riotRegion ?? 'americas';
@@ -212,9 +210,6 @@ export function createServer(deps: ServerDeps = {}): Express {
     };
   }
 
-  // Casos de uso por plataforma, memorizados: así el cliente enrutado (y sus
-  // cachés de cuenta y de partidas) persiste entre peticiones. Devuelve null si
-  // la Riot API no está configurada aún.
   const routedCache = new Map<string, RoutedBundle>();
   function routedRiot(platform: string | undefined): RoutedBundle | null {
     if (!riotClient) return null;
@@ -228,7 +223,6 @@ export function createServer(deps: ServerDeps = {}): Express {
     return bundle;
   }
 
-  /** Reconfigura (o desactiva) la Riot API con una nueva key. */
   function reconfigureRiot(apiKey: string | undefined): void {
     riotClient = apiKey ? makeRiotClient(apiKey, defaultPlatform, defaultRegion) : null;
     routedCache.clear();
@@ -236,19 +230,11 @@ export function createServer(deps: ServerDeps = {}): Express {
 
   const identityStore = deps.identityStore ?? new MemoryIdentityStore();
 
-  /**
-   * Resuelve la identidad Riot en orden de preferencia:
-   * 1) query explícita, 2) cliente local (y la recuerda), 3) última identidad
-   * conocida (para seguir mostrando el perfil aunque el cliente esté cerrado).
-   * Tolerante a fallos: nunca propaga errores del cliente.
-   */
   async function resolveIdentity(
     gameName: string | undefined,
     tagLine: string | undefined,
   ): Promise<PlayerIdentity | null> {
-    if (gameName && tagLine) {
-      return { gameName, tagLine };
-    }
+    if (gameName && tagLine) return { gameName, tagLine };
     try {
       const summoner = await detector.getCurrentSummoner();
       if (summoner && summoner.gameName && summoner.tagLine) {
@@ -265,11 +251,6 @@ export function createServer(deps: ServerDeps = {}): Express {
   const app = express();
   app.use(express.json());
 
-  /**
-   * Envuelve un handler async para que cualquier error se convierta en una
-   * respuesta 500 en vez de un unhandled rejection que deje la petición colgada
-   * (y potencialmente el proceso en mal estado).
-   */
   const wrap =
     (fn: (req: Request, res: Response) => Promise<void>) =>
     (req: Request, res: Response): void => {
@@ -280,423 +261,201 @@ export function createServer(deps: ServerDeps = {}): Express {
       });
     };
 
-  // UI web estática (dashboard). Se puede desactivar con staticDir: null.
   const staticDir =
     deps.staticDir === null
       ? null
       : deps.staticDir ?? fileURLToPath(new URL('../../public', import.meta.url));
-  if (staticDir) {
-    app.use(express.static(staticDir));
-  }
+  if (staticDir) app.use(express.static(staticDir));
 
-  app.get('/api/health', (_req: Request, res: Response) => {
-    res.json({ ok: true });
+  app.get('/api/health', (_req: Request, res: Response) => { res.json({ ok: true }); });
+
+  app.get('/api/champions', wrap(async (_req, res) => {
+    const data = await championCatalog.getData().catch(() => null);
+    if (!data) { res.status(503).json({ error: 'catalog_unavailable' }); return; }
+    res.json(data);
+  }));
+
+  app.get('/api/client/status', async (_req, res) => {
+    try { res.json(await getClientStatus.execute()); }
+    catch (err) { res.status(500).json({ error: 'client_status_failed', message: String(err) }); }
   });
 
-  app.get(
-    '/api/champions',
-    wrap(async (_req: Request, res: Response) => {
-      const data = await championCatalog.getData().catch(() => null);
-      if (!data) {
-        res.status(503).json({ error: 'catalog_unavailable' });
-        return;
-      }
-      res.json(data);
-    }),
-  );
-
-  app.get('/api/client/status', async (_req: Request, res: Response) => {
-    try {
-      const status = await getClientStatus.execute();
-      res.json(status);
-    } catch (err) {
-      res.status(500).json({ error: 'client_status_failed', message: String(err) });
-    }
-  });
-
-  app.get('/api/live/champion', async (_req: Request, res: Response) => {
+  app.get('/api/live/champion', async (_req, res) => {
     try {
       const result = await getLiveChampion.execute();
-      if (!result) {
-        res.json({ active: false });
-        return;
-      }
-      res.json({ active: true, ...result });
-    } catch (err) {
-      res.status(500).json({ error: 'live_champion_failed', message: String(err) });
-    }
+      res.json(result ? { active: true, ...result } : { active: false });
+    } catch (err) { res.status(500).json({ error: 'live_champion_failed', message: String(err) }); }
   });
 
-  app.get(
-    '/api/live/game',
-    wrap(async (_req: Request, res: Response) => {
-      const state = await getLiveGameState.execute();
-      if (!state) {
-        res.json({ active: false });
-        return;
-      }
-      res.json({ active: true, ...state });
-    }),
-  );
+  app.get('/api/live/game', wrap(async (_req, res) => {
+    const state = await getLiveGameState.execute();
+    res.json(state ? { active: true, ...state } : { active: false });
+  }));
 
-  app.get('/api/champ-select/session', async (_req: Request, res: Response) => {
+  app.get('/api/champ-select/session', async (_req, res) => {
     try {
       const session = await getChampSelectSession.execute();
-      if (session === null) {
-        res.json({ active: false, session: null });
-        return;
-      }
-      res.json({ active: true, session });
-    } catch (err) {
-      res.status(500).json({ error: 'champ_select_failed', message: String(err) });
-    }
+      res.json(session === null ? { active: false, session: null } : { active: true, session });
+    } catch (err) { res.status(500).json({ error: 'champ_select_failed', message: String(err) }); }
   });
 
-  app.get('/api/game/queue', async (_req: Request, res: Response) => {
+  app.get('/api/game/queue', async (_req, res) => {
     try {
       const queue = await getGameQueue.execute();
-      if (queue === null) {
-        res.json({ active: false, queue: null });
-        return;
-      }
-      res.json({ active: true, queue });
-    } catch (err) {
-      res.status(500).json({ error: 'game_queue_failed', message: String(err) });
-    }
+      res.json(queue === null ? { active: false, queue: null } : { active: true, queue });
+    } catch (err) { res.status(500).json({ error: 'game_queue_failed', message: String(err) }); }
   });
 
-  app.get('/api/recommendations', async (req: Request, res: Response) => {
+  app.get('/api/recommendations', async (req, res) => {
     const parsed = recommendationsQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
-      return;
-    }
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() }); return; }
     const { role, limit, personalized, gameName, tagLine, platform } = parsed.data;
-
-    // Ruta personalizada: combina el pool base con el historial del jugador.
     if (personalized === 'true') {
       const routed = routedRiot(platform);
-      if (!routed) {
-        res.status(503).json({ error: 'riot_not_configured' });
-        return;
-      }
+      if (!routed) { res.status(503).json({ error: 'riot_not_configured' }); return; }
       const identity = await resolveIdentity(gameName, tagLine);
-      if (!identity) {
-        res.status(400).json({ error: 'identity_unavailable' });
-        return;
-      }
+      if (!identity) { res.status(400).json({ error: 'identity_unavailable' }); return; }
       try {
-        res.json(
-          await routed.personalized.execute({
-            identity,
-            ...(role ? { role } : {}),
-            ...(limit ? { limit } : {}),
-          }),
-        );
-      } catch (err) {
-        riotErrorResponse(res, err);
-      }
+        res.json(await routed.personalized.execute({ identity, ...(role ? { role } : {}), ...(limit ? { limit } : {}) }));
+      } catch (err) { riotErrorResponse(res, err); }
       return;
     }
-
     try {
-      const result = await getRecommendations.execute({
-        ...(role ? { role } : {}),
-        ...(limit ? { limit } : {}),
-      });
-      res.json(result);
-    } catch (err) {
-      res.status(500).json({ error: 'recommendations_failed', message: String(err) });
-    }
+      res.json(await getRecommendations.execute({ ...(role ? { role } : {}), ...(limit ? { limit } : {}) }));
+    } catch (err) { res.status(500).json({ error: 'recommendations_failed', message: String(err) }); }
   });
 
-  app.get('/api/aram/analysis', async (_req: Request, res: Response) => {
-    try {
-      const analysis = await getAramAnalysis.execute();
-      res.json(analysis);
-    } catch (err) {
-      res.status(500).json({ error: 'aram_analysis_failed', message: String(err) });
-    }
+  app.get('/api/aram/analysis', async (_req, res) => {
+    try { res.json(await getAramAnalysis.execute()); }
+    catch (err) { res.status(500).json({ error: 'aram_analysis_failed', message: String(err) }); }
   });
 
-  /**
-   * GET /api/aram/build
-   *
-   * Detecta el campeón que el jugador está jugando en este momento via la
-   * Live Client API y devuelve su build recomendada para ARAM con iconos
-   * enriquecidos desde Data Dragon.
-   *
-   * Respuestas:
-   *   200 { active: false }                        — no hay partida activa
-   *   200 { active: true, championId, championName, buildSource, build }  — build encontrada
-   *   500                                          — error interno
-   */
-  app.get(
-    '/api/aram/build',
-    wrap(async (_req: Request, res: Response) => {
-      // 1. Detectar campeón en partida via Live Client API
-      const live = await getLiveChampion.execute();
-      if (!live) {
-        res.json({ active: false });
-        return;
-      }
+  app.get('/api/aram/build', wrap(async (_req, res) => {
+    const live = await getLiveChampion.execute();
+    if (!live) { res.json({ active: false }); return; }
+    if (live.championId === null) {
+      res.json({ active: true, championId: null, championName: live.championName, build: null, error: 'champion_id_unresolved' });
+      return;
+    }
+    await championCatalog.getData().catch(() => null);
+    const build = await getChampionBuild.execute(live.championId, 'ARAM');
+    if (!build) { res.status(404).json({ error: 'build_not_found', championId: live.championId, championName: live.championName }); return; }
+    let enriched;
+    try { enriched = await enrichBuild(build, championCatalog); }
+    catch { enriched = bareEnrichedBuild(build); }
+    res.json({ active: true, championId: live.championId, championName: live.championName, buildSource: build.source, build: enriched });
+  }));
 
-      // championId puede ser null si el catálogo no pudo resolver el nombre
-      if (live.championId === null) {
-        res.json({
-          active: true,
-          championId: null,
-          championName: live.championName,
-          build: null,
-          error: 'champion_id_unresolved',
-        });
-        return;
-      }
-
-      // 2. Asegurar catálogo cargado (best-effort: si falla, el enriquecimiento
-      //    devolverá iconos null pero no rompe la respuesta)
-      await championCatalog.getData().catch(() => null);
-
-      // 3. Obtener build pasando rol ARAM para activar la lógica específica
-      //    (summoners Flash+Mark, ítems de ARAM, etc.)
-      const build = await getChampionBuild.execute(live.championId, 'ARAM');
-
-      // getChampionBuild nunca debería retornar null (DefaultBuildProvider como
-      // último recurso), pero lo manejamos por si acaso.
-      if (!build) {
-        res.status(404).json({
-          error: 'build_not_found',
-          championId: live.championId,
-          championName: live.championName,
-        });
-        return;
-      }
-
-      // 4. Enriquecer con iconos (best-effort: si falla devuelve build sin iconos)
-      let enriched;
-      try {
-        enriched = await enrichBuild(build, championCatalog);
-      } catch {
-        enriched = bareEnrichedBuild(build);
-      }
-
-      res.json({
-        active: true,
-        championId: live.championId,
-        championName: live.championName,
-        buildSource: build.source,
-        build: enriched,
-      });
-    }),
-  );
-
-  app.get('/api/player/profile', async (req: Request, res: Response) => {
+  app.get('/api/player/profile', async (req, res) => {
     const parsed = identityQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
-      return;
-    }
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() }); return; }
     const routed = routedRiot(parsed.data.platform);
-    if (!routed) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
+    if (!routed) { res.status(503).json({ error: 'riot_not_configured' }); return; }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
-    if (!identity) {
-      res.status(400).json({ error: 'identity_unavailable' });
-      return;
-    }
-    try {
-      res.json(await routed.profile.execute(identity));
-    } catch (err) {
-      riotErrorResponse(res, err);
-    }
+    if (!identity) { res.status(400).json({ error: 'identity_unavailable' }); return; }
+    try { res.json(await routed.profile.execute(identity)); }
+    catch (err) { riotErrorResponse(res, err); }
   });
 
-  app.get('/api/player/matches', async (req: Request, res: Response) => {
+  app.get('/api/player/matches', async (req, res) => {
     const parsed = identityQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
-      return;
-    }
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() }); return; }
     const routed = routedRiot(parsed.data.platform);
-    if (!routed) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
+    if (!routed) { res.status(503).json({ error: 'riot_not_configured' }); return; }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
-    if (!identity) {
-      res.status(400).json({ error: 'identity_unavailable' });
-      return;
-    }
+    if (!identity) { res.status(400).json({ error: 'identity_unavailable' }); return; }
     try {
       const filter = {
         ...(parsed.data.queue != null ? { queue: parsed.data.queue } : {}),
         ...(parsed.data.type ? { type: parsed.data.type } : {}),
       };
-      const matches = await routed.matches.execute(identity, parsed.data.count ?? 10, filter);
-      res.json({ matches });
-    } catch (err) {
-      riotErrorResponse(res, err);
-    }
+      res.json({ matches: await routed.matches.execute(identity, parsed.data.count ?? 10, filter) });
+    } catch (err) { riotErrorResponse(res, err); }
   });
 
-  app.get('/api/player/stats', async (req: Request, res: Response) => {
+  app.get('/api/player/stats', async (req, res) => {
     const parsed = identityQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
-      return;
-    }
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() }); return; }
     const routed = routedRiot(parsed.data.platform);
-    if (!routed) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
+    if (!routed) { res.status(503).json({ error: 'riot_not_configured' }); return; }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
-    if (!identity) {
-      res.status(400).json({ error: 'identity_unavailable' });
-      return;
-    }
-    try {
-      res.json(await routed.stats.execute(identity, parsed.data.count ?? 20));
-    } catch (err) {
-      riotErrorResponse(res, err);
-    }
+    if (!identity) { res.status(400).json({ error: 'identity_unavailable' }); return; }
+    try { res.json(await routed.stats.execute(identity, parsed.data.count ?? 20)); }
+    catch (err) { riotErrorResponse(res, err); }
   });
 
-  app.get('/api/player/mastery', async (req: Request, res: Response) => {
+  app.get('/api/player/mastery', async (req, res) => {
     const parsed = identityQuerySchema.safeParse(req.query);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
-      return;
-    }
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() }); return; }
     const routed = routedRiot(parsed.data.platform);
-    if (!routed) {
-      res.status(503).json({ error: 'riot_not_configured' });
-      return;
-    }
+    if (!routed) { res.status(503).json({ error: 'riot_not_configured' }); return; }
     const identity = await resolveIdentity(parsed.data.gameName, parsed.data.tagLine);
-    if (!identity) {
-      res.status(400).json({ error: 'identity_unavailable' });
-      return;
-    }
-    try {
-      const mastery = await routed.mastery.execute(identity, parsed.data.count ?? 8);
-      res.json({ mastery });
-    } catch (err) {
-      riotErrorResponse(res, err);
-    }
+    if (!identity) { res.status(400).json({ error: 'identity_unavailable' }); return; }
+    try { res.json({ mastery: await routed.mastery.execute(identity, parsed.data.count ?? 8) }); }
+    catch (err) { riotErrorResponse(res, err); }
   });
 
-  app.get(
-    '/api/builds',
-    wrap(async (req: Request, res: Response) => {
-      const parsed = buildsQuerySchema.safeParse(req.query);
-      if (!parsed.success) {
-        res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() });
-        return;
-      }
-      // Asegura el catálogo (best-effort) para inferir la build de cualquier campeón.
-      await championCatalog.getData().catch(() => null);
-      const build = await getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
-      if (!build) {
-        res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId });
-        return;
-      }
-      try {
-        res.json(await enrichBuild(build, championCatalog));
-      } catch {
-        res.json(bareEnrichedBuild(build));
-      }
-    }),
-  );
+  app.get('/api/builds', wrap(async (req, res) => {
+    const parsed = buildsQuerySchema.safeParse(req.query);
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_query', details: parsed.error.flatten() }); return; }
+    await championCatalog.getData().catch(() => null);
+    const build = await getChampionBuild.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN');
+    if (!build) { res.status(404).json({ error: 'build_not_found', championId: parsed.data.championId }); return; }
+    try { res.json(await enrichBuild(build, championCatalog)); }
+    catch { res.json(bareEnrichedBuild(build)); }
+  }));
 
-  // Aplica en el cliente de LoL la página de runas de la build recomendada.
-  app.post(
-    '/api/runes/apply',
-    wrap(async (req: Request, res: Response) => {
-      const parsed = buildsQuerySchema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() });
-        return;
-      }
-      await championCatalog.getData().catch(() => null);
-      const meta = championCatalog.getMeta(parsed.data.championId);
-      try {
-        await applyRunePage.execute(
-          parsed.data.championId,
-          parsed.data.role ?? 'UNKNOWN',
-          meta?.name,
-        );
-        res.json({ ok: true });
-      } catch (err) {
-        if (err instanceof LcuUnavailableError) {
-          res.status(503).json({ error: 'client_not_running' });
-          return;
-        }
-        res.status(500).json({ error: 'rune_apply_failed', message: String(err) });
-      }
-    }),
-  );
+  app.post('/api/runes/apply', wrap(async (req, res) => {
+    const parsed = buildsQuerySchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() }); return; }
+    await championCatalog.getData().catch(() => null);
+    const meta = championCatalog.getMeta(parsed.data.championId);
+    try {
+      await applyRunePage.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN', meta?.name);
+      res.json({ ok: true });
+    } catch (err) {
+      if (err instanceof LcuUnavailableError) { res.status(503).json({ error: 'client_not_running' }); return; }
+      res.status(500).json({ error: 'rune_apply_failed', message: String(err) });
+    }
+  }));
 
-  // Crea en el cliente el set de ítems (iniciales/core/situacionales) de la build.
-  app.post(
-    '/api/items/apply',
-    wrap(async (req: Request, res: Response) => {
-      const parsed = buildsQuerySchema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() });
-        return;
-      }
-      await championCatalog.getData().catch(() => null);
-      const meta = championCatalog.getMeta(parsed.data.championId);
-      try {
-        await applyItemSet.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN', meta?.name);
-        res.json({ ok: true });
-      } catch (err) {
-        if (err instanceof LcuUnavailableError) {
-          res.status(503).json({ error: 'client_not_running' });
-          return;
-        }
-        res.status(500).json({ error: 'item_apply_failed', message: String(err) });
-      }
-    }),
-  );
+  app.post('/api/items/apply', wrap(async (req, res) => {
+    const parsed = buildsQuerySchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() }); return; }
+    await championCatalog.getData().catch(() => null);
+    const meta = championCatalog.getMeta(parsed.data.championId);
+    try {
+      await applyItemSet.execute(parsed.data.championId, parsed.data.role ?? 'UNKNOWN', meta?.name);
+      res.json({ ok: true });
+    } catch (err) {
+      if (err instanceof LcuUnavailableError) { res.status(503).json({ error: 'client_not_running' }); return; }
+      res.status(500).json({ error: 'item_apply_failed', message: String(err) });
+    }
+  }));
 
-  // Ajustes: estado de configuración (nunca devuelve la key) y guardar la key.
-  app.get('/api/settings', (_req: Request, res: Response) => {
+  app.get('/api/settings', (_req, res) => {
     res.json({ riotConfigured: riotClient != null, hasKey: !!settingsStore.get().riotApiKey });
   });
 
   const settingsBodySchema = z.object({ riotApiKey: z.string().trim().min(1).max(120).optional() });
-  app.put(
-    '/api/settings',
-    wrap(async (req: Request, res: Response) => {
-      const parsed = settingsBodySchema.safeParse(req.body ?? {});
-      if (!parsed.success) {
-        res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() });
-        return;
-      }
-      if (parsed.data.riotApiKey !== undefined) {
-        const key = parsed.data.riotApiKey;
-        // Validamos la key contra la Riot API antes de guardarla, para dar
-        // feedback claro (una cuenta cualquiera vale como prueba de conexión).
-        const probe = makeRiotClient(key, defaultPlatform, defaultRegion);
-        try {
-          await probe.getAccountByRiotId('Riot Phreak', 'NA1');
-        } catch (err) {
-          if (err instanceof RiotApiError && (err.status === 401 || err.status === 403)) {
-            res.status(400).json({ error: 'riot_api_key_invalid' });
-            return;
-          }
-          // Otros errores (404 de la cuenta de prueba, red…) => la key es válida.
+  app.put('/api/settings', wrap(async (req, res) => {
+    const parsed = settingsBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) { res.status(400).json({ error: 'invalid_body', details: parsed.error.flatten() }); return; }
+    if (parsed.data.riotApiKey !== undefined) {
+      const key = parsed.data.riotApiKey;
+      const probe = makeRiotClient(key, defaultPlatform, defaultRegion);
+      try {
+        await probe.getAccountByRiotId('Riot Phreak', 'NA1');
+      } catch (err) {
+        if (err instanceof RiotApiError && (err.status === 401 || err.status === 403)) {
+          res.status(400).json({ error: 'riot_api_key_invalid' }); return;
         }
-        settingsStore.set({ riotApiKey: key });
-        reconfigureRiot(key);
       }
-      res.json({ ok: true, riotConfigured: riotClient != null });
-    }),
-  );
+      settingsStore.set({ riotApiKey: key });
+      reconfigureRiot(key);
+    }
+    res.json({ ok: true, riotConfigured: riotClient != null });
+  }));
 
   return app;
 }
