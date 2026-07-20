@@ -160,11 +160,13 @@ export function createServer(deps: ServerDeps = {}): Express {
   const buildProvider =
     deps.buildProvider ??
     new FallbackBuildProvider([
-      // 1) Meraki Analytics: ítems recomendados por Riot, sin Cloudflare, sin API key.
-      new MerakiBuildProvider(),
-      // 2) Builds curadas a mano para campeones específicos.
+      // 1) Builds curadas a mano: máxima calidad para los campeones cubiertos.
+      //    Van primero para que NO las tape la heurística de Meraki.
       new SeedBuildProvider(),
-      // 3) Build por subclase clasificada a mano para cada campeón (cobertura total).
+      // 2) Meraki Analytics: ítems por arquetipo para el resto (sin API key, sin
+      //    Cloudflare, datos al día por parche).
+      new MerakiBuildProvider(),
+      // 3) Build por subclase clasificada a mano (cobertura total si Meraki no responde).
       new ClassifiedBuildProvider(championCatalog),
       // 4) Respaldo por tags de Data Dragon y por rasgos de ARAM.
       new CatalogArchetypeBuildProvider(championCatalog),
