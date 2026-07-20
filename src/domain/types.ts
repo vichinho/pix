@@ -16,7 +16,7 @@ export type ClientState =
   | 'UNKNOWN';
 
 /** Roles / líneas soportados. */
-export type Role = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | 'UNKNOWN';
+export type Role = 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY' | 'ARAM' | 'UNKNOWN';
 
 /** Resumen mínimo del invocador local. */
 export interface SummonerSummary {
@@ -26,12 +26,132 @@ export interface SummonerSummary {
   profileIconId?: number;
 }
 
+/** Entrada de liga para una cola clasificatoria. */
+export interface RankedEntry {
+  tier: string;        // IRON | BRONZE | SILVER | GOLD | PLATINUM | EMERALD | DIAMOND | MASTER | GRANDMASTER | CHALLENGER
+  division: string;    // I | II | III | IV (vacío para Master+)
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+}
+
+/** Mejor liga histórica conocida. */
+export interface PeakRank {
+  tier: string;
+  division: string;
+  year?: number;  // año de la temporada (si lo tenemos)
+}
+
+/** Perfil del jugador resuelto vía Riot API (GET /api/player/profile). */
+export interface PlayerProfile {
+  puuid: string;
+  gameName: string;
+  tagLine: string;
+  summonerLevel: number | null;
+  profileIconId: number | null;
+  region: string;
+  /** Cola solo/dúo, null si no clasificado. */
+  soloQueue: RankedEntry | null;
+  /** Cola flex, null si no clasificado. */
+  flexQueue: RankedEntry | null;
+  /** Mejor liga histórica derivada de los datos actuales, null si sin datos. */
+  peakRank: PeakRank | null;
+}
+
+/** Resumen de una partida reciente (GET /api/player/matches). */
+export interface MatchSummary {
+  matchId: string;
+  queueId: number;
+  championId: number;
+  championName: string;
+  championLevel: number;
+  role: Role;
+  kills: number;
+  deaths: number;
+  assists: number;
+  win: boolean;
+  durationSec: number;
+  playedAt: string;
+  /** Ítems finales (7 slots, 0 = vacío). */
+  items: number[];
+  /** Hechizos de invocador [d, f]. */
+  summonerSpells: number[];
+  /** Súbditos + monstruos neutrales. */
+  cs: number;
+  /** Oro ganado. */
+  gold: number;
+  /** Daño total a campeones. */
+  damage: number;
+  /** Puntuación de visión. */
+  visionScore: number;
+}
+
 /** Contrato: estado del cliente (GET /api/client/status). */
 export interface ClientStatus {
   connected: boolean;
   clientState: ClientState;
   summoner: SummonerSummary | null;
   lastUpdated: string;
+}
+
+/** Fase de la sesión de champion select. */
+export type ChampSelectPhase =
+  | 'PLANNING'
+  | 'BAN_PICK'
+  | 'FINALIZATION'
+  | 'GAME_STARTING'
+  | 'UNKNOWN';
+
+/**
+ * Instantánea de la sesión de champion select, centrada en el jugador local.
+ * Contrato: GET /api/champ-select/session.
+ */
+export interface ChampSelectSnapshot {
+  /** Fase actual de la selección. */
+  phase: ChampSelectPhase;
+  /** Rol/línea asignado al jugador local (UNKNOWN si es blind/no asignado). */
+  assignedRole: Role;
+  /** cellId del jugador local dentro de la sesión. */
+  localPlayerCellId: number;
+  /** Campeón elegido/hovering por el jugador local (null si aún no elige). */
+  selectedChampionId: number | null;
+  /** ¿El pick del jugador local está confirmado (locked in)? */
+  pickCompleted: boolean;
+  /** championIds baneados en la partida (ambos equipos). */
+  bans: number[];
+}
+
+/**
+ * Categoría semántica del tipo de partida, derivada del queueId del cliente.
+ */
+export type GameQueueCategory =
+  | 'CASUAL_SWIFTPLAY'
+  | 'NORMAL_DRAFT'
+  | 'RANKED_SOLO'
+  | 'RANKED_FLEX'
+  | 'ARAM'
+  | 'CO_OP_VS_AI'
+  | 'CLASH'
+  | 'PRACTICE_TOOL'
+  | 'CUSTOM'
+  | 'OTHER'
+  | 'UNKNOWN';
+
+/**
+ * Información del tipo de partida en curso o en preparación.
+ * Contrato: GET /api/game/queue.
+ */
+export interface GameQueueInfo {
+  queueId: number;
+  category: GameQueueCategory;
+  label: string;
+  isRanked: boolean;
+  isPracticeTool: boolean;
+  isCustom: boolean;
+  gameMode: string | null;
+  mapId: number | null;
+  rawName: string | null;
+  rawType: string | null;
 }
 
 /** Recomendación individual de campeón. */
@@ -48,15 +168,28 @@ export interface RecommendationsResponse {
   recommendations: ChampionRecommendation[];
 }
 
-/** Contrato: build del campeón (GET /api/builds). */
+/** Página de runas referenciada por IDs de Data Dragon. */
+export interface RuneSelection {
+  primaryStyleId: number;
+  secondaryStyleId: number;
+  keystoneId: number;
+  primary: number[];
+  secondary: number[];
+  shards: number[];
+}
+
+/** Contrato interno de build. */
 export interface ChampionBuild {
   championId: number;
   championName: string;
   role: Role;
-  patch: string;
-  runes: number[];
-  summonerSpells: number[];
+  summonerSpells: string[];
+  runes: RuneSelection;
+  startingItems: number[];
   coreItems: number[];
   situationalItems: number[];
   skillOrder: string[];
+  source: string;
+  patch: string;
+  notes?: string;
 }

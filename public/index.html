@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PIX</title>
+    <link rel="icon" type="image/svg+xml" href="/pix-icon.svg" />
+    <link rel="apple-touch-icon" href="/pix-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css?v=28" />
+  </head>
+  <body>
+    <!-- Pantalla de bienvenida (se muestra al lanzar y se desvanece sola) -->
+    <div id="splash" class="splash">
+      <div class="splash-stage">
+        <div class="splash-glow"></div>
+        <img class="splash-logo" src="/pix-icon.svg" alt="PIX" width="160" height="160" />
+        <span class="splash-spark s1"></span>
+        <span class="splash-spark s2"></span>
+        <span class="splash-spark s3"></span>
+        <span class="splash-spark s4"></span>
+      </div>
+      <div class="splash-word">PIX</div>
+      <div class="splash-tag" data-i18n="Tu hada compañera en la Grieta">Tu hada compañera en la Grieta</div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <img class="brand-logo" src="/pix-icon.svg" alt="" width="26" height="26" />
+        <span class="brand-name">PIX</span>
+      </div>
+      <div class="topbar-right">
+        <div class="lang-switch" id="langSwitch" role="group" aria-label="Idioma">
+          <button type="button" class="lang-btn" data-lang="es">ES</button>
+          <button type="button" class="lang-btn" data-lang="en">EN</button>
+        </div>
+        <div class="settings-wrap">
+          <button type="button" id="settingsBtn" class="icon-btn" data-i18n-al="Ajustes" aria-label="Ajustes" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span id="settingsDot" class="settings-dot"></span>
+          </button>
+          <div id="settingsPanel" class="settings-panel" hidden>
+            <div class="sp-row">
+              <span class="sp-label" data-i18n="Estado del cliente">Estado del cliente</span>
+              <span id="clientBadge" class="pill" data-i18n="Cliente">Cliente</span>
+            </div>
+            <div class="sp-row">
+              <span class="sp-label">Riot API</span>
+              <span id="riotBadge" class="pill">Riot API</span>
+            </div>
+            <div class="sp-sep"></div>
+            <button type="button" id="reconfigKeyBtn" class="sp-action" data-i18n="Configurar clave de Riot API">Configurar clave de Riot API</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+
+        <!-- Aviso de tilt (racha de derrotas) -->
+        <section class="card tilt-card" id="tiltCard" hidden>
+          <div id="tiltBody"></div>
+        </section>
+
+        <!-- Tarjeta de perfil -->
+        <section class="card profile-card" id="profileCard">
+          <div id="profileBody">
+            <div class="profile-skeleton">
+              <div class="skeleton-rank-emblem"></div>
+              <div class="skeleton-lines">
+                <div class="skeleton-line w80"></div>
+                <div class="skeleton-line w50"></div>
+                <div class="skeleton-line w60"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Maestría de campeones -->
+        <section class="card" id="masteryCard" hidden>
+          <div class="card-header">
+            <span class="card-title" data-i18n="Maestría de campeones">Maestría de campeones</span>
+          </div>
+          <div id="masteryBody" class="muted text-sm">—</div>
+        </section>
+
+        <!-- Resumen de la última partida -->
+        <section class="card" id="lastGameCard" hidden>
+          <div class="card-header">
+            <span class="card-title" data-i18n="Tu última partida">Tu última partida</span>
+          </div>
+          <div id="lastGameBody" class="text-sm">—</div>
+        </section>
+
+        <!-- Rendimiento -->
+        <section class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="Rendimiento reciente">Rendimiento reciente</span>
+          </div>
+          <div id="statsBody" class="muted text-sm">—</div>
+        </section>
+
+        <!-- Historial de partidas -->
+        <section class="card match-history-card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="Historial de partidas">Historial de partidas</span>
+            <span id="matchPageInfo" class="match-page-info"></span>
+          </div>
+          <div class="match-filter">
+            <select id="matchQueueFilter" class="match-filter-select" data-i18n-al="Filtrar por modo" aria-label="Filtrar por modo">
+              <option value="" data-i18n="Todos los modos">Todos los modos</option>
+              <option value="450" data-i18n="ARAM">ARAM</option>
+              <option value="ranked" data-i18n="Clasificatoria">Clasificatoria</option>
+              <option value="normal" data-i18n="Normal">Normal</option>
+            </select>
+          </div>
+          <div id="matchesBody" class="muted text-sm">—</div>
+          <div id="matchPagination" class="match-pagination" hidden>
+            <button id="matchPrevBtn" class="pag-btn" disabled data-i18n-al="Página anterior" aria-label="Página anterior">‹</button>
+            <span id="matchPageLabel" class="pag-label">1 / 1</span>
+            <button id="matchNextBtn" class="pag-btn" disabled data-i18n-al="Página siguiente" aria-label="Página siguiente">›</button>
+          </div>
+        </section>
+
+      </aside>
+
+      <section class="main">
+        <div class="card context-card">
+          <div class="context-header">
+            <div class="context-title-group">
+              <h2 id="contextTitle" class="context-title" data-i18n="Contexto">Contexto</h2>
+              <span id="queueBadge" class="pill ghost">—</span>
+            </div>
+          </div>
+          <div id="contextBody" class="context-body hint" data-i18n-html="context-intro">
+            Abre el cliente de LoL y entra a una partida. En <strong>selección de
+            campeón</strong> verás los campeones recomendados para tu línea y las
+            runas de tu pick; ya <strong>en partida</strong>, tu build completa.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="legal" data-i18n-html="footer-legal">
+      Proyecto personal no oficial · No afiliado ni patrocinado por Riot Games · League of Legends es marca registrada de Riot Games, Inc.
+    </footer>
+
+    <script src="/i18n.js?v=28"></script>
+    <script src="/champion-tips.js?v=28"></script>
+    <script src="/app.js?v=28"></script>
+  </body>
+</html>

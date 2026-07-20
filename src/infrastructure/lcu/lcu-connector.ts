@@ -2,6 +2,19 @@ import https from 'node:https';
 import http from 'node:http';
 import type { LcuCredentials } from './lockfile.js';
 
+/** Error HTTP del LCU que preserva el código de estado para el que llama. */
+export class LcuHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly method: string,
+    readonly path: string,
+    readonly body: string,
+  ) {
+    super(`LCU ${method} ${path} respondió ${status}: ${body}`);
+    this.name = 'LcuHttpError';
+  }
+}
+
 /**
  * Construye el header de autorización Basic para el LCU.
  * El usuario siempre es "riot" y el password viene del lockfile.
@@ -24,6 +37,24 @@ export interface LcuRequestOptions {
 }
 
 /**
+ * Agente HTTPS compartido para todas las conexiones al LCU.
+ *
+ * Cada tick del frontend crea varios lectores (champ-select, aram, queue,
+ * status…) y cada uno instanciaba su propio `LcuConnector` con su propio
+ * `https.Agent`. Con `keepAlive` eso multiplicaba los sockets abiertos hacia el
+ * LCU y, en partidas ARAM (donde se consultan varios endpoints por tick),
+ * saturaba las conexiones y provocaba timeouts en cascada (estado UNKNOWN,
+ * perfil/historial vacíos). Un único agente con límite de sockets reutiliza las
+ * conexiones y mantiene el número acotado.
+ */
+const sharedLcuAgent = new https.Agent({
+  rejectUnauthorized: false,
+  keepAlive: true,
+  maxSockets: 8,
+  maxFreeSockets: 4,
+});
+
+/**
  * Conector de bajo nivel al League Client (LCU).
  *
  * El LCU expone un certificado autofirmado de Riot, por lo que la verificación
@@ -35,11 +66,11 @@ export class LcuConnector {
   private readonly agent: https.Agent;
 
   constructor(private readonly creds: LcuCredentials) {
-    this.agent = new https.Agent({ rejectUnauthorized: false, keepAlive: true });
+    this.agent = sharedLcuAgent;
   }
 
   async request<T = unknown>(path: string, options: LcuRequestOptions = {}): Promise<T> {
-    const { method = 'GET', timeoutMs = 5000, body } = options;
+    const { method = 'GET', timeoutMs = 4000, body } = options;
     const url = new URL(path, baseUrl(this.creds));
     const transport = this.creds.protocol === 'https' ? https : http;
     const payload = body === undefined ? undefined : JSON.stringify(body);
@@ -69,7 +100,7 @@ export class LcuConnector {
             const raw = Buffer.concat(chunks).toString('utf8');
             const status = res.statusCode ?? 0;
             if (status < 200 || status >= 300) {
-              reject(new Error(`LCU ${method} ${path} respondió ${status}: ${raw}`));
+              reject(new LcuHttpError(status, method, path, raw));
               return;
             }
             if (raw.length === 0) {

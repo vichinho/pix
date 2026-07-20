@@ -1,0 +1,411 @@
+<title>PIX — Your fairy companion on the Rift</title>
+<meta name="description" content="PIX is a free desktop companion for League of Legends: profile, rank, match history, champion‑select builds, live coaching and more. Runs locally with your own Riot API key." />
+<style>
+  :root {
+    --night:   #0f0824;
+    --night-2: #170e30;
+    --night-3: #241548;
+    --panel:   rgba(255,255,255,0.035);
+    --panel-2: rgba(255,255,255,0.055);
+    --border:  rgba(178,150,255,0.16);
+    --border-2:rgba(178,150,255,0.30);
+    --cyan:    #8FF0E8;
+    --pink:    #F6A6D6;
+    --gold:    #F6C177;
+    --text:    #ECE7F7;
+    --muted:   #B7A6E0;
+    --faint:   #7C6BA6;
+    --maxw: 1080px;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--night);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.65;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  /* Ambient cosmos: gradient wash + drifting dust canvas */
+  .bg {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(90% 60% at 50% -10%, #2a1656 0%, rgba(42,22,86,0) 60%),
+      radial-gradient(70% 50% at 85% 15%, rgba(143,240,232,0.10) 0%, rgba(143,240,232,0) 60%),
+      radial-gradient(60% 45% at 12% 30%, rgba(246,166,214,0.10) 0%, rgba(246,166,214,0) 60%),
+      var(--night);
+  }
+  #dust { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 1.5rem; }
+
+  /* ── Nav ── */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.4rem 0; gap: 1rem;
+  }
+  .brand { display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 700; letter-spacing: 0.04em; }
+  .brand .mark { width: 30px; height: 30px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
+  .nav-links { display: flex; align-items: center; gap: 1.4rem; font-size: 0.9rem; color: var(--muted); }
+  .nav-links a { text-decoration: none; transition: color .2s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-ghost { display: none; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.55rem;
+    padding: 0.8rem 1.35rem; border-radius: 11px; font-weight: 600; font-size: 0.95rem;
+    text-decoration: none; border: 1px solid transparent; cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+  }
+  .btn-primary {
+    color: #1a0f2e;
+    background: linear-gradient(100deg, var(--cyan), var(--pink));
+    box-shadow: 0 10px 30px -8px rgba(246,166,214,0.5);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 40px -8px rgba(246,166,214,0.6); }
+  .btn-ghost { color: var(--text); border-color: var(--border-2); background: var(--panel); }
+  .btn-ghost:hover { border-color: var(--cyan); transform: translateY(-2px); }
+
+  /* ── Hero ── */
+  .hero { text-align: center; padding: 2.5rem 0 3.5rem; }
+  .fairy-stage { position: relative; width: 210px; height: 210px; margin: 0 auto 0.5rem; }
+  .fairy-glow {
+    position: absolute; inset: -10%;
+    background: radial-gradient(circle at 50% 42%, rgba(143,240,232,0.30), rgba(246,166,214,0.18) 42%, transparent 68%);
+    filter: blur(8px); border-radius: 50%;
+    animation: pulse 3.4s ease-in-out infinite;
+  }
+  .fairy { position: relative; width: 210px; height: 210px; display: block; animation: float 4s ease-in-out infinite; }
+  .eyebrow {
+    display: inline-block; margin-bottom: 0.5rem;
+    font-size: 0.74rem; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gold); font-weight: 600;
+  }
+  .wordmark {
+    margin: 0.1rem 0 0.4rem;
+    font-size: clamp(3.4rem, 10vw, 5.75rem);
+    font-weight: 800; letter-spacing: 0.16em; line-height: 1;
+    padding-left: 0.16em;
+    background: linear-gradient(100deg, var(--cyan), var(--pink) 60%, var(--gold));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-wrap: balance;
+  }
+  .tagline { margin: 0 0 1.1rem; font-size: clamp(1.15rem, 3vw, 1.55rem); color: var(--text); font-weight: 500; text-wrap: balance; }
+  .lede { max-width: 42rem; margin: 0 auto 1.9rem; color: var(--muted); font-size: 1.05rem; text-wrap: pretty; }
+  .cta { display: flex; gap: 0.8rem; justify-content: center; flex-wrap: wrap; }
+  .platforms { margin-top: 1.1rem; font-size: 0.82rem; color: var(--faint); letter-spacing: 0.02em; }
+  .platforms b { color: var(--muted); font-weight: 600; }
+
+  /* ── Section scaffolding ── */
+  section { padding: 3.2rem 0; }
+  .sec-head { max-width: 40rem; margin: 0 auto 2.2rem; text-align: center; }
+  .sec-head .eyebrow { color: var(--cyan); }
+  .sec-head h2 { margin: 0.2rem 0 0.5rem; font-size: clamp(1.7rem, 3.6vw, 2.35rem); font-weight: 750; letter-spacing: -0.01em; text-wrap: balance; }
+  .sec-head p { margin: 0; color: var(--muted); }
+
+  /* ── Feature grid ── */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 1.4rem 1.35rem; transition: transform .2s ease, border-color .2s ease, background .2s ease;
+  }
+  .card:hover { transform: translateY(-4px); border-color: var(--border-2); background: var(--panel-2); }
+  .card .ic {
+    width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
+    margin-bottom: 0.85rem; font-size: 1.25rem;
+    background: linear-gradient(135deg, rgba(143,240,232,0.16), rgba(246,166,214,0.16));
+    border: 1px solid var(--border);
+  }
+  .card h3 { margin: 0 0 0.35rem; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.005em; }
+  .card p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.6; }
+
+  /* ── Steps ── */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+  .step { position: relative; padding: 1.6rem 1.3rem 1.4rem; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); }
+  .step .n {
+    font-variant-numeric: tabular-nums; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--gold); margin-bottom: 0.7rem; display: inline-block;
+  }
+  .step h3 { margin: 0 0 0.35rem; font-size: 1.05rem; font-weight: 650; }
+  .step p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .step p a { color: var(--cyan); }
+
+  /* ── Privacy strip ── */
+  .privacy {
+    display: flex; gap: 1.1rem; align-items: flex-start;
+    max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.6rem;
+    border: 1px solid var(--border); border-radius: 16px;
+    background: linear-gradient(135deg, rgba(143,240,232,0.06), rgba(246,166,214,0.06));
+  }
+  .privacy .lock { font-size: 1.5rem; line-height: 1; }
+  .privacy h3 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+  .privacy p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+
+  /* ── Footer ── */
+  footer { border-top: 1px solid var(--border); margin-top: 1.5rem; padding: 2.2rem 0 2.8rem; }
+  .foot-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .foot-links { display: flex; gap: 1.3rem; font-size: 0.9rem; color: var(--muted); }
+  .foot-links a { text-decoration: none; transition: color .2s; }
+  .foot-links a:hover { color: var(--cyan); }
+  .legal { font-size: 0.76rem; color: var(--faint); line-height: 1.6; max-width: 56rem; }
+
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+  @keyframes pulse { 0%,100% { transform: scale(0.95); opacity: 0.8; } 50% { transform: scale(1.06); opacity: 1; } }
+
+  @media (max-width: 820px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .steps { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr; }
+    .nav-links a[href="#features"], .nav-links a[href="#how"] { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fairy, .fairy-glow { animation: none; }
+  }
+</style>
+
+<div class="bg"></div>
+<canvas id="dust"></canvas>
+
+<div class="wrap">
+  <nav class="nav">
+    <span class="brand">
+      <!-- app icon mark -->
+      <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+        <defs>
+          <linearGradient id="mBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1A1033"/><stop offset="1" stop-color="#2E1856"/></linearGradient>
+          <linearGradient id="mBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FF0E8"/><stop offset="1" stop-color="#F6A6D6"/></linearGradient>
+        </defs>
+        <rect width="512" height="512" rx="112" fill="url(#mBg)"/>
+        <path d="M256,262 C198,230 146,236 112,272 C136,304 198,304 256,282 Z" fill="#DFF9F5" opacity="0.85"/>
+        <path d="M256,262 C314,230 366,236 400,272 C376,304 314,304 256,282 Z" fill="#DFF9F5" opacity="0.85"/>
+        <ellipse cx="256" cy="300" rx="58" ry="66" fill="url(#mBody)"/>
+        <circle cx="235" cy="272" r="5.5" fill="#1A1033"/><circle cx="277" cy="272" r="5.5" fill="#1A1033"/>
+        <path d="M256,180 C258,200 258,200 280,209 C258,218 258,218 256,238 C254,218 254,218 232,209 C254,200 254,200 256,180 Z" fill="#F6C177"/>
+      </svg>
+      PIX
+    </span>
+    <span class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="https://github.com/vichinho/pix" target="_blank" rel="noopener">GitHub</a>
+    </span>
+  </nav>
+
+  <header class="hero">
+    <div class="fairy-stage">
+      <div class="fairy-glow"></div>
+      <!-- floating fairy (no card) -->
+      <svg class="fairy" viewBox="80 90 352 300" aria-label="PIX fairy">
+        <defs>
+          <linearGradient id="hBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8FF0E8"/><stop offset="1" stop-color="#F6A6D6"/></linearGradient>
+        </defs>
+        <circle cx="188" cy="176" r="10" fill="#F6C177" opacity="0.9"/>
+        <circle cx="162" cy="146" r="6" fill="#F6C177" opacity="0.7"/>
+        <circle cx="145" cy="120" r="3.5" fill="#F6C177" opacity="0.5"/>
+        <path d="M256,262 C198,230 146,236 112,272 C136,304 198,304 256,282 Z" fill="#DFF9F5" opacity="0.9"/>
+        <path d="M256,262 C314,230 366,236 400,272 C376,304 314,304 256,282 Z" fill="#DFF9F5" opacity="0.9"/>
+        <ellipse cx="256" cy="300" rx="58" ry="66" fill="url(#hBody)"/>
+        <circle cx="235" cy="272" r="5.5" fill="#12082a"/>
+        <circle cx="277" cy="272" r="5.5" fill="#12082a"/>
+        <path d="M256,180 C258,200 258,200 280,209 C258,218 258,218 256,238 C254,218 254,218 232,209 C254,200 254,200 256,180 Z" fill="#F6C177"/>
+      </svg>
+    </div>
+
+    <span class="eyebrow">League of Legends companion</span>
+    <h1 class="wordmark">PIX</h1>
+    <p class="tagline">Your fairy companion on the Rift</p>
+    <p class="lede">
+      A free desktop app that reads your League client and turns each session into a head start —
+      your rank and stats, champion‑select builds and runes, a live objective coach, and honest
+      post‑game feedback. All on your machine, with your own Riot API key.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/vichinho/pix/releases/latest" target="_blank" rel="noopener">↓ Download for Windows</a>
+      <a class="btn btn-ghost" href="https://github.com/vichinho/pix" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+    <p class="platforms">Free · <b>Windows</b> · macOS · Linux · Español &amp; English</p>
+  </header>
+
+  <section id="features">
+    <div class="sec-head">
+      <span class="eyebrow">What it does</span>
+      <h2>Everything you check before and during a game — in one place</h2>
+      <p>PIX watches the client and shows the right thing at the right moment: the lobby, champion select, the game itself.</p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="ic">🏆</div>
+        <h3>Profile &amp; rank</h3>
+        <p>Level, ranked tier with emblem, LP, win rate and your peak league — at a glance.</p>
+      </div>
+      <div class="card">
+        <div class="ic">📜</div>
+        <h3>Match history &amp; stats</h3>
+        <p>Recent games with KDA and per‑champion win rates, plus ARAM and ranked filters.</p>
+      </div>
+      <div class="card">
+        <div class="ic">🎯</div>
+        <h3>Champion‑select assistant</h3>
+        <p>Recommended picks for your role, runes, summoner spells, item build and a full skill‑order grid.</p>
+      </div>
+      <div class="card">
+        <div class="ic">🐉</div>
+        <h3>Live coach</h3>
+        <p>Dragon, Herald and Baron timers on the Rift, and composition analysis in ARAM.</p>
+      </div>
+      <div class="card">
+        <div class="ic">✨</div>
+        <h3>Mastery &amp; build explorer</h3>
+        <p>Your champion mastery, and a searchable explorer for any champion's build and runes by lane.</p>
+      </div>
+      <div class="card">
+        <div class="ic">🧘</div>
+        <h3>Post‑game &amp; tilt check</h3>
+        <p>Plain‑language summary of your last game, one thing to improve, and a gentle nudge on losing streaks.</p>
+      </div>
+      <div class="card">
+        <div class="ic">⚡</div>
+        <h3>Apply to client</h3>
+        <p>Push the suggested runes and item set straight into the League client with one click.</p>
+      </div>
+      <div class="card">
+        <div class="ic">🌐</div>
+        <h3>Español &amp; English</h3>
+        <p>Switch languages any time from the top bar — the whole interface follows.</p>
+      </div>
+      <div class="card">
+        <div class="ic">🔒</div>
+        <h3>Local &amp; private</h3>
+        <p>No shared server. Your key and data stay on your device and are never sent to anyone.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="sec-head">
+      <span class="eyebrow">Get started</span>
+      <h2>Up and running in three steps</h2>
+      <p>No account to create, nothing to configure on a server. It runs next to your League client.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="n">01</span>
+        <h3>Download &amp; install</h3>
+        <p>Grab the installer for your system and open PIX. The window opens next to your game.</p>
+      </div>
+      <div class="step">
+        <span class="n">02</span>
+        <h3>Paste your Riot API key</h3>
+        <p>Get a free key at <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">developer.riotgames.com</a> and paste it in Settings. It's stored locally.</p>
+      </div>
+      <div class="step">
+        <span class="n">03</span>
+        <h3>Open League and play</h3>
+        <p>PIX detects your account and game state automatically — profile, builds and coaching appear on their own.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="privacy">
+      <span class="lock">🔒</span>
+      <div>
+        <h3>Your data stays yours</h3>
+        <p>PIX runs entirely on your computer. It uses <b>your own</b> Riot API key, stored locally, to read <b>your</b> profile and matches — and nothing else. There is no PIX server, no account, and no tracking.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot-top">
+      <span class="brand">
+        <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
+          <rect width="512" height="512" rx="112" fill="url(#mBg)"/>
+          <path d="M256,262 C198,230 146,236 112,272 C136,304 198,304 256,282 Z" fill="#DFF9F5" opacity="0.85"/>
+          <path d="M256,262 C314,230 366,236 400,272 C376,304 314,304 256,282 Z" fill="#DFF9F5" opacity="0.85"/>
+          <ellipse cx="256" cy="300" rx="58" ry="66" fill="url(#mBody)"/>
+          <circle cx="235" cy="272" r="5.5" fill="#1A1033"/><circle cx="277" cy="272" r="5.5" fill="#1A1033"/>
+          <path d="M256,180 C258,200 258,200 280,209 C258,218 258,218 256,238 C254,218 254,218 232,209 C254,200 254,200 256,180 Z" fill="#F6C177"/>
+        </svg>
+        PIX
+      </span>
+      <span class="foot-links">
+        <a href="https://github.com/vichinho/pix" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/vichinho/pix/releases/latest" target="_blank" rel="noopener">Download</a>
+        <a href="https://developer.riotgames.com/" target="_blank" rel="noopener">Riot Developer</a>
+      </span>
+    </div>
+    <p class="legal">
+      PIX isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone
+      officially involved in producing or managing Riot Games properties. Riot Games and all associated
+      properties are trademarks or registered trademarks of Riot Games, Inc. League of Legends © Riot Games, Inc.
+    </p>
+  </footer>
+</div>
+
+<script>
+  // Ambient pixie dust drifting upward — quiet, respects reduced motion.
+  (function () {
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var c = document.getElementById('dust');
+    var x = c.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var W, H, parts;
+    var colors = ['#F6C177', '#8FF0E8', '#F6A6D6'];
+
+    function resize() {
+      W = c.width = Math.floor(innerWidth * dpr);
+      H = c.height = Math.floor(innerHeight * dpr);
+      c.style.width = innerWidth + 'px';
+      c.style.height = innerHeight + 'px';
+      var n = Math.round((innerWidth * innerHeight) / 26000);
+      parts = [];
+      for (var i = 0; i < n; i++) parts.push(mk(true));
+    }
+    function mk(anywhere) {
+      return {
+        x: Math.random() * W,
+        y: anywhere ? Math.random() * H : H + 10 * dpr,
+        r: (Math.random() * 1.6 + 0.5) * dpr,
+        s: (Math.random() * 0.4 + 0.12) * dpr,
+        drift: (Math.random() - 0.5) * 0.25 * dpr,
+        a: Math.random() * 0.5 + 0.2,
+        tw: Math.random() * Math.PI * 2,
+        col: colors[(Math.random() * colors.length) | 0]
+      };
+    }
+    function frame() {
+      x.clearRect(0, 0, W, H);
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i];
+        p.y -= p.s; p.x += p.drift; p.tw += 0.03;
+        if (p.y < -10 * dpr) parts[i] = mk(false);
+        var a = p.a * (0.6 + 0.4 * Math.sin(p.tw));
+        x.globalAlpha = a;
+        x.fillStyle = p.col;
+        x.beginPath();
+        x.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        x.fill();
+      }
+      x.globalAlpha = 1;
+      requestAnimationFrame(frame);
+    }
+    resize();
+    addEventListener('resize', resize);
+    if (!reduce) frame();
+    else { // one static pass
+      for (var i = 0; i < parts.length; i++) { var p = parts[i]; x.globalAlpha = p.a; x.fillStyle = p.col; x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI*2); x.fill(); }
+      x.globalAlpha = 1;
+    }
+  })();
+</script>

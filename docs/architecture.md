@@ -1,6 +1,6 @@
 # Arquitectura
 
-LoL Companion sigue una arquitectura **local-first** con capas limpias. El backend
+PIX sigue una arquitectura **local-first** con capas limpias. El backend
 local expone una API HTTP consumida por la UI (React/Electron en fases futuras).
 
 ## Capas
@@ -24,12 +24,18 @@ fallos) sin un cliente de LoL real, usando un conector falso.
 | Método | Ruta | Estado |
 |---|---|---|
 | GET | `/api/health` | ✅ |
+| GET | `/api/champions` | ✅ |
 | GET | `/api/client/status` | ✅ |
-| GET | `/api/player/profile` | 🚧 501 |
-| GET | `/api/player/matches` | 🚧 501 |
-| GET | `/api/champ-select/session` | 🚧 501 |
-| GET | `/api/recommendations?role=TOP` | 🚧 501 |
-| GET | `/api/builds?championId=24&role=TOP` | 🚧 501 |
+| GET | `/api/player/profile` | ✅ |
+| GET | `/api/player/matches` | ✅ |
+| GET | `/api/player/stats` | ✅ |
+| GET | `/api/recommendations?personalized=true` | ✅ |
+| GET | `/api/champ-select/session` | ✅ |
+| GET | `/api/live/champion` | ✅ |
+| GET | `/api/game/queue` | ✅ |
+| GET | `/api/recommendations?role=TOP` | ✅ |
+| GET | `/api/aram/analysis` | ✅ |
+| GET | `/api/builds?championId=24&role=TOP` | ✅ |
 | GET · PUT | `/api/settings` | 🚧 501 |
 
 ## Decisiones (ADR resumidas)
