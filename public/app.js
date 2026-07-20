@@ -1182,6 +1182,82 @@ function currentStreak() {
   return { n, win };
 }
 
+/** Mejor y peor campeón por winrate (con un mínimo de partidas). */
+function championRecords(minGames = 3) {
+  const by = new Map();
+  for (const m of matchState.all) {
+    let e = by.get(m.championId);
+    if (!e) { e = { championId: m.championId, name: m.championName || champName(m.championId), games: 0, wins: 0 }; by.set(m.championId, e); }
+    e.games += 1; if (m.win) e.wins += 1;
+  }
+  const list = [...by.values()].filter((e) => e.games >= minGames).map((e) => ({ ...e, wr: e.wins / e.games }));
+  if (!list.length) return { best: null, worst: null };
+  const byWr = [...list].sort((a, b) => b.wr - a.wr || b.games - a.games);
+  const best = byWr[0];
+  const wc = byWr[byWr.length - 1];
+  const worst = wc && wc.wr <= 0.45 && wc.championId !== best.championId ? wc : null;
+  return { best, worst };
+}
+
+/** Franjas horarias (hora local del jugador). */
+const TIME_SLOTS = [
+  { key: 'Madrugada', from: 0, to: 6 },
+  { key: 'Mañana', from: 6, to: 12 },
+  { key: 'Tarde', from: 12, to: 18 },
+  { key: 'Noche', from: 18, to: 24 },
+];
+/** Franja horaria con mejor winrate (mínimo de partidas). */
+function bestTimeSlot(minGames = 3) {
+  const buckets = {};
+  for (const m of matchState.all) {
+    if (!m.playedAt) continue;
+    const h = new Date(m.playedAt).getHours();
+    const slot = TIME_SLOTS.find((s) => h >= s.from && h < s.to);
+    if (!slot) continue;
+    const b = buckets[slot.key] || (buckets[slot.key] = { games: 0, wins: 0 });
+    b.games += 1; if (m.win) b.wins += 1;
+  }
+  let best = null;
+  for (const [key, b] of Object.entries(buckets)) {
+    if (b.games < minGames) continue;
+    const wr = b.wins / b.games;
+    if (!best || wr > best.wr) best = { key, wr, games: b.games };
+  }
+  return best;
+}
+
+/** Marcador de hoy (V–D), o null si no jugaste hoy. */
+function todayRecord() {
+  const now = new Date();
+  let w = 0, l = 0;
+  for (const m of matchState.all) {
+    if (!m.playedAt) continue;
+    const d = new Date(m.playedAt);
+    if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+      if (m.win) w += 1; else l += 1;
+    }
+  }
+  return (w + l) ? { w, l } : null;
+}
+
+/** Chip de insight: icono + etiqueta + valor (con opcional icono de campeón y WR). */
+function insightChip(ico, label, valueHtml, wr, tone) {
+  const wrBadge = wr != null ? `<b class="pi-wr ${tone || ''}">${wr}%</b>` : '';
+  return `<div class="pg-insight">
+    <span class="pi-ico">${ico}</span>
+    <div class="pi-body">
+      <span class="pi-label">${esc(label)}</span>
+      <span class="pi-val">${valueHtml} ${wrBadge}</span>
+    </div>
+  </div>`;
+}
+
+/** Icono pequeño de campeón para los insights. */
+function champIconMini(id) {
+  const url = champIconUrl(id);
+  return url ? `<img class="pi-champ" src="${esc(url)}" alt="" loading="lazy"/>` : '';
+}
+
 /** Panel del coach de progreso; se inyecta arriba del explorador cuando estás inactivo. */
 function renderProgressInto(el) {
   if (!el) return;
@@ -1221,6 +1297,17 @@ function renderProgressInto(el) {
 
   const focus = focusInsight(p);
 
+  // Insights: mejor campeón, "ojo con", mejor horario, marcador de hoy.
+  const rec = championRecords();
+  const slot = bestTimeSlot();
+  const today = todayRecord();
+  const chips = [];
+  if (rec.best) chips.push(insightChip('🏅', T('Mejor campeón'), champIconMini(rec.best.championId) + esc(rec.best.name), Math.round(rec.best.wr * 100), 'good'));
+  if (rec.worst) chips.push(insightChip('⚠️', T('Ojo con'), champIconMini(rec.worst.championId) + esc(rec.worst.name), Math.round(rec.worst.wr * 100), 'bad'));
+  if (slot) chips.push(insightChip('⏰', T('Mejor horario'), T(slot.key), Math.round(slot.wr * 100), 'good'));
+  if (today) chips.push(insightChip('📅', T('Hoy'), `${today.w}–${today.l}`, null, ''));
+  const insightsHtml = chips.length ? `<div class="pg-insights">${chips.join('')}</div>` : '';
+
   el.innerHTML = `
     <div class="pg-head">
       <span class="pg-title">${T('Tu progreso')}</span>
@@ -1233,6 +1320,7 @@ function renderProgressInto(el) {
     <div class="pg-goals">
       ${['kda', 'deaths', 'csmin', 'vision'].map(goalCard).join('')}
     </div>
+    ${insightsHtml}
     <div class="pg-focus">
       <span class="pg-focus-ico">🎯</span>
       <div><span class="pg-focus-label">${T('Foco de la semana')}: ${T(GOAL_META[focus.key].label)}</span>

@@ -381,6 +381,30 @@ body {
 }
 .pg-target:focus { border-color: var(--accent); }
 
+.pg-insights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.pg-insight {
+  display: flex; align-items: center; gap: 0.6rem;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0.6rem 0.7rem;
+}
+.pi-ico { font-size: 1.05rem; line-height: 1; }
+.pi-body { display: flex; flex-direction: column; min-width: 0; }
+.pi-label { font-size: 0.68rem; color: var(--faint); letter-spacing: 0.02em; }
+.pi-val {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.9rem; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pi-champ { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.pi-wr { font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pi-wr.good { color: var(--win); }
+.pi-wr.bad { color: var(--loss); }
+
 .pg-focus {
   display: flex; gap: 0.7rem; align-items: flex-start;
   background: var(--accent-soft); border: 1px solid rgba(201,168,76,0.22);
