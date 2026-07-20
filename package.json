@@ -54,7 +54,7 @@
       "category": "Game"
     },
     "publish": [
-      { "provider": "github", "owner": "vichinho", "repo": "pix" }
+      { "provider": "github", "owner": "vichinho", "repo": "pix", "releaseType": "release" }
     ]
   },
   "dependencies": {
